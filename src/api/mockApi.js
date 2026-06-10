@@ -35,7 +35,10 @@ export const apiMagicLink = async (email) => {
 // Products
 export const apiGetProducts = async (filters = {}) => {
   await delay(500);
-  let results = [...PRODUCTS];
+  let results = PRODUCTS.map(p => ({
+    ...p,
+    deliveryTime: p.id % 3 === 0 ? 'Same Day' : p.id % 3 === 1 ? '1-2 Days' : '3-5 Days'
+  }));
   if (filters.category) results = results.filter(p => p.category === filters.category);
   if (filters.search) {
     const q = filters.search.toLowerCase();
@@ -50,6 +53,7 @@ export const apiGetProducts = async (filters = {}) => {
   if (filters.maxPrice) results = results.filter(p => p.price <= filters.maxPrice);
   if (filters.minRating) results = results.filter(p => p.rating >= filters.minRating);
   if (filters.inStock) results = results.filter(p => p.stock > 0);
+  if (filters.deliveryTime) results = results.filter(p => p.deliveryTime === filters.deliveryTime);
   if (filters.sort === 'price_asc') results.sort((a, b) => a.price - b.price);
   else if (filters.sort === 'price_desc') results.sort((a, b) => b.price - a.price);
   else if (filters.sort === 'rating') results.sort((a, b) => b.rating - a.rating);
@@ -61,7 +65,10 @@ export const apiGetProduct = async (id) => {
   await delay(400);
   const product = PRODUCTS.find(p => p.id === Number(id));
   if (!product) throw new Error('Product not found');
-  return product;
+  return {
+    ...product,
+    deliveryTime: product.id % 3 === 0 ? 'Same Day' : product.id % 3 === 1 ? '1-2 Days' : '3-5 Days'
+  };
 };
 
 export const apiCreateProduct = async (data) => {

@@ -18,7 +18,7 @@ const FOOTER_LINKS = [
       ['Browse Sellers', '/sellers'],
       ['Become a Seller', '/register'],
       ['Seller Dashboard', '/seller'],
-      ['Seller Guidelines', '#'],
+      ['Ecosystem & Vision', '/about'],
     ],
   },
   {
@@ -34,11 +34,11 @@ const FOOTER_LINKS = [
   {
     title: 'Support',
     links: [
-      ['Help Center', '#'],
-      ['Contact Us', '#'],
-      ['Returns Policy', '#'],
+      ['Help Center', '/profile?tab=profile'],
+      ['Contact Us', '/profile?tab=profile'],
+      ['Pricing & Policies', '/profile?tab=legal'],
       ['Track Order', '/orders'],
-      ['Privacy Policy', '#'],
+      ['Privacy Policy', '/profile?tab=legal'],
     ],
   },
 ];

@@ -1,15 +1,15 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import {
-  FiPlus, FiEdit2, FiTrash2, FiTrendingUp, FiPackage, FiDollarSign,
-  FiShoppingCart, FiDownload, FiGrid, FiList, FiStar, FiAlertCircle,
-  FiCheckCircle, FiClock, FiTruck, FiArrowUp, FiArrowDown, FiEye,
-  FiMessageCircle, FiSettings, FiBarChart2, FiUsers,
+import { Link, useLocation } from 'react-router-dom';
+import { 
+  FiPlus, FiEdit2, FiTrash2, FiTrendingUp, FiPackage, FiDollarSign, 
+  FiShoppingCart, FiDownload, FiGrid, FiList, FiStar, FiAlertCircle, 
+  FiCheckCircle, FiClock, FiTruck, FiArrowUp, FiArrowDown, FiEye, 
+  FiMessageCircle, FiSettings, FiBarChart2, FiUsers, FiLock, FiCalendar
 } from 'react-icons/fi';
 import { FaStar } from 'react-icons/fa';
-import {
-  AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  BarChart, Bar, CartesianGrid,
+import { 
+  AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, 
+  BarChart, Bar, CartesianGrid, LineChart, Line, Legend
 } from 'recharts';
 import { useApp } from '../context/AppContext';
 import { SELLER_ANALYTICS, PRODUCTS } from '../data/mockData';
@@ -23,445 +23,397 @@ const STATUS_ICON = {
   shipped: <FiTruck size={12} />, delivered: <FiCheckCircle size={12} />,
 };
 
-const MOCK_ORDERS = [
-  { id: 'RKT-1042', customer: 'Chidi Okonkwo',   date: '2026-03-20', items: 2, total: 73000,  status: 'shipped' },
-  { id: 'RKT-1038', customer: 'Ngozi Eze',        date: '2026-03-18', items: 1, total: 95000,  status: 'delivered' },
-  { id: 'RKT-1031', customer: 'Emeka Obiora',     date: '2026-03-15', items: 3, total: 42500,  status: 'processing' },
-  { id: 'RKT-1025', customer: 'Funmilayo Bello',  date: '2026-03-12', items: 1, total: 55000,  status: 'pending' },
-  { id: 'RKT-1019', customer: 'Tunde Adeyemi',    date: '2026-03-10', items: 2, total: 130000, status: 'delivered' },
-  { id: 'RKT-1014', customer: 'Amaka Igwe',       date: '2026-03-08', items: 1, total: 45000,  status: 'shipped' },
+const MOCK_MONTHS = [
+  'June 2026', 'May 2026', 'April 2026', 'March 2026', 'February 2026', 
+  'January 2026', 'December 2025', 'November 2025', 'October 2025', 
+  'September 2025', 'August 2025', 'July 2025'
 ];
-
-const RECENT_ACTIVITY = [
-  { icon: FiShoppingCart, text: 'New order from Chidi Okonkwo', sub: '₦73,000 · 2 items', time: '5 min ago', color: 'text-blue-600 bg-blue-50' },
-  { icon: FiStar,         text: 'New 5-star review on Headphones', sub: '"Excellent product!"', time: '1 hr ago', color: 'text-yellow-600 bg-yellow-50' },
-  { icon: FiPackage,      text: 'Low stock alert: Smart Watch', sub: 'Only 3 units left', time: '3 hrs ago', color: 'text-orange-600 bg-orange-50' },
-  { icon: FiCheckCircle,  text: 'Order RKT-1038 delivered', sub: 'Ngozi Eze confirmed receipt', time: '5 hrs ago', color: 'text-green-600 bg-green-50' },
-  { icon: FiMessageCircle,text: 'New message from Emeka Obiora', sub: 'Asking about warranty', time: 'Yesterday', color: 'text-purple-600 bg-purple-50' },
-];
-
-const NAV_ITEMS = [
-  { id: 'overview',  icon: FiGrid,        label: 'Overview' },
-  { id: 'products',  icon: FiPackage,     label: 'Products' },
-  { id: 'orders',    icon: FiShoppingCart,label: 'Orders' },
-  { id: 'analytics', icon: FiBarChart2,   label: 'Analytics' },
-  { id: 'messages',  icon: FiMessageCircle,label: 'Messages' },
-  { id: 'settings',  icon: FiSettings,    label: 'Settings' },
-];
-
-const fmt = (n) => '₦' + Number(n).toLocaleString('en-NG');
 
 export default function SellerDashboard() {
-  const { addToast } = useApp();
+  const { addToast, subscription, sellerMetrics, requestPayout } = useApp();
   const [loading, setLoading] = useState(true);
+  const inputCls = 'w-full px-4 py-2.5 rounded-xl text-sm border border-gray-200 bg-gray-50 text-gray-900 placeholder-gray-400 outline-none focus:border-blue-500 focus:bg-white transition-all';
+  const location = useLocation();
+
+  // Dashboard view selection: 'overview' | 'listings' | 'orders' | 'earnings' | 'retinaview' | 'settings'
   const [tab, setTab] = useState('overview');
-  const [products, setProducts] = useState([]);
-  const [modalOpen, setModalOpen] = useState(false);
-  const [editProduct, setEditProduct] = useState(null);
-  const [form, setForm] = useState({ name: '', price: '', stock: '', category: '', description: '' });
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   useEffect(() => {
-    setTimeout(() => { setProducts(PRODUCTS.filter(p => p.sellerId === 1)); setLoading(false); }, 700);
+    const params = new URLSearchParams(location.search);
+    const tabParam = params.get('tab');
+    if (tabParam) {
+      setTab(tabParam);
+    }
+  }, [location.search]);
+
+  // Sub-tabs for Home Screen / Listings & Orders
+  const [listingsTab, setListingsTab] = useState('active'); // 'active' | 'pending'
+  const [analyticsTab, setAnalyticsTab] = useState('overview'); // RETINAview tabs: overview | revenue | products | customers | performance
+
+  // Listings state
+  const [products, setProducts] = useState([]);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editProduct, setEditProduct] = useState(null);
+  const [deleteConfirmId, setDeleteConfirmId] = useState(null);
+
+  // Form states
+  const [form, setForm] = useState({ name: '', price: '', stock: '', category: 'Electronics', description: '', deliveryTime: '1-2 Days' });
+
+  // Mark Delivered states
+  const [deliveryOrderId, setDeliveryOrderId] = useState(null);
+
+  // Payout request modal states
+  const [payoutModalOpen, setPayoutModalOpen] = useState(false);
+  const [payoutForm, setPayoutForm] = useState({ bankName: 'Access Bank', accountNumber: '', accountName: '', amount: '' });
+
+  // Limit upgrade modal state
+  const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
+  const [upgradeReason, setUpgradeReason] = useState('');
+
+  // Historical date picker state
+  const [selectedMonth, setSelectedMonth] = useState('June 2026');
+
+  // Load products
+  useEffect(() => {
+    setTimeout(() => { 
+      setProducts(PRODUCTS.filter(p => p.sellerId === 1).map(p => ({
+        ...p,
+        views: Math.floor(Math.random() * 500) + 100,
+        ordersCount: Math.floor(Math.random() * 40) + 5,
+      }))); 
+      setLoading(false); 
+    }, 500);
   }, []);
 
   const openCreate = () => {
     setEditProduct(null);
-    setForm({ name: '', price: '', stock: '', category: '', description: '' });
+    setForm({ name: '', price: '', stock: '', category: 'Electronics', description: '', deliveryTime: '1-2 Days' });
     setModalOpen(true);
   };
+
   const openEdit = (p) => {
     setEditProduct(p);
-    setForm({ name: p.name, price: p.price, stock: p.stock, category: p.category, description: p.description });
+    setForm({ name: p.name, price: p.price, stock: p.stock, category: p.category, description: p.description, deliveryTime: p.deliveryTime || '1-2 Days' });
     setModalOpen(true);
   };
+
   const handleSave = () => {
     if (editProduct) {
       setProducts(prev => prev.map(p => p.id === editProduct.id
         ? { ...p, ...form, price: Number(form.price), stock: Number(form.stock) } : p));
-      addToast('Product updated successfully');
+      addToast('Listing updated successfully');
     } else {
       setProducts(prev => [...prev, {
-        id: Date.now(), ...form, price: Number(form.price), stock: Number(form.stock),
-        rating: 0, reviewCount: 0,
+        id: Date.now(), 
+        ...form, 
+        price: Number(form.price), 
+        stock: Number(form.stock),
+        rating: 0, 
+        reviewCount: 0,
+        views: 0,
+        ordersCount: 0,
         images: ['https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400&q=80'],
-        sellerId: 1, sellerName: 'Chukwuemeka Gadgets', featured: false,
-        variants: { colors: [], sizes: [] }, tags: [],
+        sellerId: 1, 
+        sellerName: 'Chukwuemeka Gadgets', 
+        featured: false,
+        variants: { colors: [], sizes: [] }, 
+        tags: [],
       }]);
-      addToast('Product created successfully');
+      addToast('New listing created successfully');
     }
     setModalOpen(false);
   };
-  const handleDelete = (id) => {
+
+  const handleDeleteListing = (id) => {
     setProducts(prev => prev.filter(p => p.id !== id));
-    addToast('Product deleted', 'info');
+    setDeleteConfirmId(null);
+    addToast('Product listing deleted', 'info');
   };
 
-  const kpis = [
-    { label: 'Total Revenue',  value: fmt(940000), change: '+32%', up: true,  icon: FiDollarSign,  color: 'bg-blue-600',   light: 'bg-blue-50 text-blue-600' },
-    { label: 'Total Orders',   value: '94',        change: '+18%', up: true,  icon: FiShoppingCart,color: 'bg-indigo-600', light: 'bg-indigo-50 text-indigo-600' },
-    { label: 'Products Listed',value: loading ? '—' : String(products.length), change: '', up: true, icon: FiPackage, color: 'bg-purple-600', light: 'bg-purple-50 text-purple-600' },
-    { label: 'Avg. Rating',    value: '4.7',       change: '+0.2', up: true,  icon: FiStar,        color: 'bg-yellow-500', light: 'bg-yellow-50 text-yellow-600' },
+  // Safe checks for Premium Features
+  const handleTabChange = (targetTab) => {
+    if (targetTab === 'retinaview' && subscription?.plan === 'Free Plan') {
+      setUpgradeReason('RETINAview Analytics requires a Premium Subscription plan.');
+      setShowUpgradePrompt(true);
+    } else {
+      setTab(targetTab);
+    }
+  };
+
+  const handleMarkAsDelivered = () => {
+    addToast(`Order ${deliveryOrderId} marked as delivered. 48h Escrow auto-release timer started.`, 'success');
+    setDeliveryOrderId(null);
+  };
+
+  const submitPayout = () => {
+    const amount = Number(payoutForm.amount);
+    if (!amount || amount <= 0) {
+      addToast('Please enter a valid payout amount', 'error');
+      return;
+    }
+    if (amount > sellerMetrics.balance) {
+      addToast('Insufficient balance for this withdrawal amount', 'error');
+      return;
+    }
+    requestPayout(payoutForm, amount);
+    setPayoutModalOpen(false);
+    setPayoutForm({ bankName: 'Access Bank', accountNumber: '', accountName: '', amount: '' });
+  };
+
+  const isFree = subscription?.plan === 'Free Plan';
+  const fmt = (n) => '₦' + Number(n).toLocaleString('en-NG');
+
+  const navItems = [
+    { id: 'overview',   icon: FiGrid,        label: 'Dashboard' },
+    { id: 'listings',   icon: FiPackage,     label: 'Listings Manager' },
+    { id: 'orders',     icon: FiShoppingCart,label: 'Escrow Orders' },
+    { id: 'earnings',   icon: FiDollarSign,  label: 'Earnings & Payout' },
+    { id: 'retinaview', icon: FiBarChart2,   label: 'RETINAview Analytics', premium: true },
+    { id: 'settings',   icon: FiSettings,    label: 'Profile Settings' },
   ];
 
-  const inputCls = 'w-full px-3 py-2.5 rounded-xl text-sm border border-gray-200 bg-gray-50 text-gray-900 placeholder-gray-400 outline-none focus:border-blue-500 focus:bg-white transition-colors';
-
   return (
-    <div className="min-h-screen bg-gray-50 flex">
-      {/* ── Sidebar ── */}
-      <aside className={`${sidebarCollapsed ? 'w-16' : 'w-56'} shrink-0 bg-gray-950 flex flex-col transition-all duration-300 sticky top-0 h-screen`}>
-        {/* Brand */}
-        <div className="flex items-center gap-3 px-4 py-5 border-b border-gray-800">
-          <div className="w-8 h-8 rounded-xl bg-blue-600 flex items-center justify-center shrink-0">
+    <div className="min-h-screen bg-gray-50 flex font-sans">
+      
+      {/* ── Sidebar Navigation ── */}
+      <aside className={`${sidebarCollapsed ? 'w-16' : 'w-60'} shrink-0 bg-slate-950 flex flex-col transition-all duration-300 sticky top-0 h-screen z-20`}>
+        <div className="flex items-center gap-3 px-4 py-5 border-b border-slate-800">
+          <div className="w-8 h-8 rounded-xl bg-blue-600 flex items-center justify-center shrink-0 shadow-lg shadow-blue-500/10">
             <FiTrendingUp size={16} className="text-white" />
           </div>
           {!sidebarCollapsed && (
-            <div className="min-w-0">
-              <p className="text-white font-black text-xs leading-tight">REKTINA</p>
-              <p className="text-blue-400 font-black text-xs leading-tight">SELLER</p>
+            <div>
+              <p className="text-white font-black text-xs tracking-wider leading-tight">REKTINA</p>
+              <p className="text-blue-400 font-bold text-[10px] tracking-wider leading-tight">SELLER PORTAL</p>
             </div>
           )}
         </div>
 
-        {/* Seller info */}
-        {!sidebarCollapsed && (
-          <div className="px-4 py-4 border-b border-gray-800">
-            <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center text-white font-black text-sm shrink-0">
-                C
-              </div>
-              <div className="min-w-0">
-                <p className="text-white text-xs font-semibold truncate">Chukwuemeka Gadgets</p>
-                <div className="flex items-center gap-1 mt-0.5">
-                  <div className="w-1.5 h-1.5 rounded-full bg-green-400" />
-                  <p className="text-gray-400 text-[10px]">Active seller</p>
+        <nav className="flex-1 px-2.5 py-6 space-y-1 overflow-y-auto">
+          {navItems.map((item) => (
+            <button key={item.id} onClick={() => handleTabChange(item.id)}
+              className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl text-xs font-bold transition-all ${tab === item.id ? 'bg-blue-600 text-white shadow-md shadow-blue-500/15' : 'text-slate-400 hover:text-white hover:bg-slate-900'}`}>
+              <item.icon size={16} className="shrink-0" />
+              {!sidebarCollapsed && (
+                <div className="flex items-center justify-between w-full">
+                  <span>{item.label}</span>
+                  {item.premium && isFree && <FiLock className="text-amber-500 shrink-0" size={12} />}
                 </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Nav */}
-        <nav className="flex-1 px-2 py-4 space-y-0.5 overflow-y-auto">
-          {NAV_ITEMS.map((navItem) => (
-            <button key={navItem.id} onClick={() => setTab(navItem.id)}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-colors ${tab === navItem.id ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-800'}`}>
-              <navItem.icon size={16} className="shrink-0" />
-              {!sidebarCollapsed && <span className="font-medium">{navItem.label}</span>}
+              )}
             </button>
           ))}
         </nav>
 
-        {/* Collapse toggle */}
-        <div className="px-2 pb-4">
+        <div className="px-3 pb-4">
           <button onClick={() => setSidebarCollapsed(c => !c)}
-            className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-gray-500 hover:text-white hover:bg-gray-800 transition-colors text-xs">
-            {sidebarCollapsed ? '→' : '← Collapse'}
+            className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-slate-500 hover:text-white hover:bg-slate-900 transition-colors text-[10px] uppercase font-bold tracking-wider">
+            {sidebarCollapsed ? '→' : '← Collapse Panel'}
           </button>
         </div>
       </aside>
 
-      {/* ── Main ── */}
+      {/* ── Main Container ── */}
       <div className="flex-1 min-w-0 flex flex-col">
-        {/* Top bar */}
-        <header className="bg-white border-b border-gray-100 px-6 py-4 flex items-center justify-between sticky top-0 z-10">
+        {/* Top Header */}
+        <header className="bg-white border-b border-gray-100 px-6 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sticky top-0 z-10">
           <div>
-            <h1 className="text-lg font-black text-gray-900 capitalize">{tab === 'overview' ? 'Dashboard Overview' : tab}</h1>
-            <p className="text-xs text-gray-400 mt-0.5">Welcome back, Chukwuemeka</p>
+            <div className="flex items-center gap-2">
+              <h1 className="text-lg font-black text-gray-900 capitalize">{tab === 'overview' ? 'Seller Hub' : tab.replace('retinaview', 'RETINAview')}</h1>
+              {isFree && (
+                <span className="bg-amber-50 text-amber-600 px-2 py-0.5 rounded-md text-[9px] font-bold border border-amber-100 uppercase tracking-wider">Free Plan Tier</span>
+              )}
+            </div>
+            <p className="text-xs text-gray-400 mt-0.5">Shop Admin: Chukwuemeka Gadgets</p>
           </div>
-          <div className="flex items-center gap-3">
-            <button onClick={() => addToast('CSV export started', 'info')}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors">
-              <FiDownload size={14} /> Export
+          
+          <div className="flex items-center gap-2.5">
+            {tab === 'retinaview' && (
+              <div className="relative">
+                <FiCalendar className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={13} />
+                <select 
+                  value={selectedMonth} 
+                  onChange={e => setSelectedMonth(e.target.value)}
+                  className="pl-8 pr-8 py-2 rounded-xl border border-gray-200 text-xs font-bold bg-white text-gray-700 outline-none focus:border-blue-500 cursor-pointer"
+                >
+                  {MOCK_MONTHS.map(m => <option key={m}>{m}</option>)}
+                </select>
+              </div>
+            )}
+            
+            <button onClick={() => addToast('Exporting data as CSV...')}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl border border-gray-200 text-xs font-bold text-gray-600 hover:bg-slate-50 transition-colors">
+              <FiDownload size={14} /> Export Report
             </button>
-            {tab === 'products' && (
+            
+            {tab === 'listings' && (
               <button onClick={openCreate}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition-colors shadow-sm">
-                <FiPlus size={14} /> Add Product
+                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-all shadow-md shadow-blue-50">
+                <FiPlus size={14} /> New Listing
               </button>
             )}
           </div>
         </header>
 
+        {/* Dynamic Warning Banners for Free Users */}
+        {isFree && (
+          <div className="bg-amber-50 border-b border-amber-100 px-6 py-2.5 flex items-center justify-between gap-4">
+            <p className="text-[11px] text-amber-800 font-semibold leading-snug flex items-center gap-2">
+              <FiAlertCircle className="text-amber-500 shrink-0" size={14} />
+              You are using a Free Plan. Unlock +1.05% escrow savings, RETINAview visitor analytics, and VIP listings.
+            </p>
+            <button 
+              onClick={() => { setUpgradeReason('Upgrade to Premium to activate custom business listings.'); setShowUpgradePrompt(true); }}
+              className="px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg text-[10px] uppercase tracking-wider shrink-0 transition-colors"
+            >
+              Upgrade Now
+            </button>
+          </div>
+        )}
+
+        {/* Dashboard Main Workspace */}
         <main className="flex-1 p-6 overflow-y-auto">
 
-          {/* ── OVERVIEW ── */}
+          {/* ── TABS 1: HUB OVERVIEW ── */}
           {tab === 'overview' && (
-            <div className="space-y-6">
-              {/* KPI cards */}
-              <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-                {kpis.map((kpi) => (
-                  <div key={kpi.label} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex flex-col gap-3">
+            <div className="space-y-6 animate-fade-in">
+              {/* Core KPIs */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                {[
+                  { label: 'Escrow Balance', value: fmt(sellerMetrics.balance), change: '+32.4%', up: true, icon: FiDollarSign, light: 'bg-emerald-50 text-emerald-600' },
+                  { label: 'Weekly Orders', value: '18 Orders', change: '+12%', up: true, icon: FiShoppingCart, light: 'bg-blue-50 text-blue-600' },
+                  { label: 'Conversion Rate', value: '4.8%', change: '+0.5%', up: true, icon: FiTrendingUp, light: 'bg-purple-50 text-purple-600' },
+                  { label: 'Account Strikes', value: `${sellerMetrics.strikes}/3`, change: 'Limit: 3', up: false, icon: FiAlertCircle, light: 'bg-red-50 text-red-500' }
+                ].map((kpi, idx) => (
+                  <div key={idx} className="bg-white rounded-3xl border border-gray-100 p-5 flex flex-col justify-between h-32 shadow-sm">
                     <div className="flex items-center justify-between">
                       <div className={`w-10 h-10 rounded-xl ${kpi.light} flex items-center justify-center`}>
                         <kpi.icon size={18} />
                       </div>
-                      {kpi.change && (
-                        <span className={`flex items-center gap-0.5 text-xs font-bold px-2 py-0.5 rounded-full ${kpi.up ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-500'}`}>
-                          {kpi.up ? <FiArrowUp size={10} /> : <FiArrowDown size={10} />} {kpi.change}
-                        </span>
-                      )}
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${kpi.up ? 'bg-green-50 text-green-600' : 'bg-slate-100 text-slate-500'}`}>
+                        {kpi.change}
+                      </span>
                     </div>
                     <div>
-                      <p className="text-2xl font-black text-gray-900">{loading ? '—' : kpi.value}</p>
-                      <p className="text-xs text-gray-400 mt-0.5">{kpi.label}</p>
+                      <p className="text-xl font-black text-gray-900">{kpi.value}</p>
+                      <p className="text-[10px] text-gray-400 font-bold uppercase mt-1 tracking-wider">{kpi.label}</p>
                     </div>
                   </div>
                 ))}
               </div>
 
-              {/* Charts row */}
-              <div className="grid xl:grid-cols-3 gap-4">
-                {/* Revenue chart */}
-                <div className="xl:col-span-2 bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-                  <div className="flex items-center justify-between mb-5">
-                    <div>
-                      <p className="font-bold text-gray-900">Revenue Trend</p>
-                      <p className="text-xs text-gray-400 mt-0.5">Last 6 months</p>
-                    </div>
-                    <span className="text-xs font-semibold text-green-600 bg-green-50 px-2.5 py-1 rounded-full flex items-center gap-1">
-                      <FiArrowUp size={10} /> +32% vs last period
-                    </span>
+              {/* Pending Escrows & Performance Section */}
+              <div className="grid lg:grid-cols-3 gap-6">
+                {/* Pending Orders Queue */}
+                <div className="lg:col-span-2 bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden flex flex-col justify-between">
+                  <div className="px-5 py-4 border-b border-gray-50 flex justify-between items-center bg-slate-50/50">
+                    <h3 className="text-xs font-black text-gray-900 uppercase tracking-wider">Awaiting Dispatch</h3>
+                    <button onClick={() => setTab('orders')} className="text-xs text-blue-600 font-bold hover:underline">Full Queue</button>
                   </div>
-                  <ResponsiveContainer width="100%" height={220}>
-                    <AreaChart data={SELLER_ANALYTICS.revenue} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
-                      <defs>
-                        <linearGradient id="revGrad" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#2563EB" stopOpacity={0.15} />
-                          <stop offset="95%" stopColor="#2563EB" stopOpacity={0} />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#F3F4F6" vertical={false} />
-                      <XAxis dataKey="month" tick={{ fill: '#9CA3AF', fontSize: 11 }} axisLine={false} tickLine={false} />
-                      <YAxis tick={{ fill: '#9CA3AF', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => `₦${(v/1000).toFixed(0)}k`} />
-                      <Tooltip formatter={v => [fmt(v), 'Revenue']} contentStyle={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: 12, fontSize: 12 }} />
-                      <Area type="monotone" dataKey="value" stroke="#2563EB" strokeWidth={2.5} fill="url(#revGrad)" dot={false} activeDot={{ r: 5, fill: '#2563EB' }} />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                </div>
-
-                {/* Orders bar */}
-                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-                  <div className="mb-5">
-                    <p className="font-bold text-gray-900">Orders</p>
-                    <p className="text-xs text-gray-400 mt-0.5">Monthly volume</p>
-                  </div>
-                  <ResponsiveContainer width="100%" height={220}>
-                    <BarChart data={SELLER_ANALYTICS.orders} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#F3F4F6" vertical={false} />
-                      <XAxis dataKey="month" tick={{ fill: '#9CA3AF', fontSize: 11 }} axisLine={false} tickLine={false} />
-                      <YAxis tick={{ fill: '#9CA3AF', fontSize: 11 }} axisLine={false} tickLine={false} />
-                      <Tooltip contentStyle={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: 12, fontSize: 12 }} />
-                      <Bar dataKey="value" fill="#2563EB" radius={[6, 6, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-
-              {/* Bottom row */}
-              <div className="grid xl:grid-cols-3 gap-4">
-                {/* Top products */}
-                <div className="xl:col-span-2 bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-                  <div className="flex items-center justify-between mb-4">
-                    <p className="font-bold text-gray-900">Top Products</p>
-                    <button onClick={() => setTab('products')} className="text-xs text-blue-600 font-semibold hover:underline">View all</button>
-                  </div>
-                  <div className="space-y-3">
-                    {SELLER_ANALYTICS.topProducts.map((p, i) => {
-                      const maxRevenue = SELLER_ANALYTICS.topProducts[0].revenue;
-                      const pct = Math.round((p.revenue / maxRevenue) * 100);
-                      return (
-                        <div key={p.name}>
-                          <div className="flex items-center justify-between mb-1">
-                            <div className="flex items-center gap-2">
-                              <span className="w-5 h-5 rounded-lg bg-gray-100 text-gray-500 text-[10px] font-bold flex items-center justify-center">{i + 1}</span>
-                              <span className="text-sm font-medium text-gray-800 truncate max-w-[180px]">{p.name}</span>
-                            </div>
-                            <div className="flex items-center gap-3 shrink-0">
-                              <span className="text-xs text-gray-400">{p.sales} sold</span>
-                              <span className="text-sm font-bold text-blue-600">{fmt(p.revenue)}</span>
-                            </div>
-                          </div>
-                          <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                            <div className="h-full bg-blue-600 rounded-full transition-all" style={{ width: `${pct}%` }} />
-                          </div>
+                  <div className="p-4 space-y-3">
+                    {[
+                      { id: 'RKT-1031', buyer: 'Emeka Obiora', item: 'Ankara Slim Shirt', amount: 8500, status: 'processing' },
+                      { id: 'RKT-1025', buyer: 'Funmilayo Bello', item: 'Smart Watch X', amount: 85000, status: 'pending' },
+                    ].map(ord => (
+                      <div key={ord.id} className="flex items-center justify-between p-3 border border-slate-50 rounded-2xl hover:bg-slate-50/50 transition-colors">
+                        <div className="min-w-0">
+                          <p className="font-mono text-xs font-bold text-blue-600">{ord.id}</p>
+                          <p className="text-xs text-gray-900 font-semibold mt-0.5">{ord.item}</p>
+                          <p className="text-[10px] text-gray-400">Buyer: {ord.buyer}</p>
                         </div>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Activity feed */}
-                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-                  <p className="font-bold text-gray-900 mb-4">Recent Activity</p>
-                  <div className="space-y-3">
-                    {RECENT_ACTIVITY.map((a, i) => (
-                      <div key={i} className="flex gap-3 items-start">
-                        <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${a.color}`}>
-                          <a.icon size={14} />
+                        <div className="text-right">
+                          <p className="font-black text-gray-900 text-xs">₦{ord.amount.toLocaleString('en-NG')}</p>
+                          <button 
+                            onClick={() => setDeliveryOrderId(ord.id)}
+                            className="mt-1 px-3 py-1 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-[10px] uppercase tracking-wider"
+                          >
+                            Mark Delivered
+                          </button>
                         </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-xs font-semibold text-gray-800 leading-snug">{a.text}</p>
-                          <p className="text-[11px] text-gray-400 mt-0.5">{a.sub}</p>
-                        </div>
-                        <span className="text-[10px] text-gray-400 shrink-0 mt-0.5">{a.time}</span>
                       </div>
                     ))}
                   </div>
                 </div>
-              </div>
-            </div>
-          )}
 
-          {/* ── PRODUCTS ── */}
-          {tab === 'products' && (
-            <div>
-              {/* Summary cards */}
-              <div className="grid grid-cols-3 gap-4 mb-6">
-                {[
-                  { label: 'Total Products', value: products.length, color: 'text-blue-600' },
-                  { label: 'Low Stock (< 10)', value: products.filter(p => p.stock < 10).length, color: 'text-orange-500' },
-                  { label: 'Out of Stock', value: products.filter(p => p.stock === 0).length, color: 'text-red-500' },
-                ].map(s => (
-                  <div key={s.label} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 text-center">
-                    <p className={`text-3xl font-black ${s.color}`}>{loading ? '—' : s.value}</p>
-                    <p className="text-xs text-gray-400 mt-1">{s.label}</p>
+                {/* AI growth engine recommendations card */}
+                <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-5 flex flex-col justify-between">
+                  <div className="border-b border-gray-50 pb-3">
+                    <h3 className="text-xs font-black text-gray-900 uppercase tracking-wider flex items-center gap-1.5">
+                      <FiStar className="text-yellow-500" />
+                      AI Growth Recommendations
+                    </h3>
                   </div>
-                ))}
-              </div>
-
-              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-                  <p className="font-bold text-gray-900">Product Inventory</p>
-                  <span className="text-xs text-gray-400">{products.length} products</span>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead className="bg-gray-50 border-b border-gray-100">
-                      <tr>
-                        {['Product', 'Category', 'Price', 'Stock', 'Rating', 'Status', 'Actions'].map(h => (
-                          <th key={h} className="text-left py-3 px-4 text-xs text-gray-400 font-semibold">{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {loading
-                        ? Array.from({ length: 4 }).map((_, i) => (
-                          <tr key={i}><td colSpan={7} className="px-4 py-3"><Skeleton className="h-10 w-full rounded-xl" /></td></tr>
-                        ))
-                        : products.map(p => (
-                          <tr key={p.id} className="border-b border-gray-50 last:border-0 hover:bg-gray-50/70 transition-colors">
-                            <td className="py-3 px-4">
-                              <div className="flex items-center gap-3">
-                                <img src={p.images[0]} alt={p.name} className="w-11 h-11 rounded-xl object-cover border border-gray-100" />
-                                <div>
-                                  <p className="font-semibold text-gray-900 line-clamp-1 max-w-[160px] text-xs">{p.name}</p>
-                                  <p className="text-[11px] text-gray-400 mt-0.5">{p.sellerName}</p>
-                                </div>
-                              </div>
-                            </td>
-                            <td className="py-3 px-4 text-xs text-gray-500">{p.category}</td>
-                            <td className="py-3 px-4 text-sm font-bold text-blue-600">{fmt(p.price)}</td>
-                            <td className="py-3 px-4">
-                              <span className={`text-xs font-bold px-2 py-1 rounded-lg ${p.stock === 0 ? 'bg-red-50 text-red-500' : p.stock < 10 ? 'bg-orange-50 text-orange-500' : 'bg-green-50 text-green-600'}`}>
-                                {p.stock} units
-                              </span>
-                            </td>
-                            <td className="py-3 px-4">
-                              <div className="flex items-center gap-1">
-                                <FaStar size={11} className="text-yellow-400" />
-                                <span className="text-xs text-gray-600 font-medium">{p.rating}</span>
-                                <span className="text-[10px] text-gray-400">({p.reviewCount})</span>
-                              </div>
-                            </td>
-                            <td className="py-3 px-4">
-                              <Badge variant={p.featured ? 'blue' : 'gray'}>{p.featured ? 'Featured' : 'Standard'}</Badge>
-                            </td>
-                            <td className="py-3 px-4">
-                              <div className="flex gap-1">
-                                <Link to={`/products/${p.id}`}
-                                  className="p-1.5 rounded-lg text-gray-300 hover:text-blue-600 hover:bg-blue-50 transition-colors">
-                                  <FiEye size={14} />
-                                </Link>
-                                <button onClick={() => openEdit(p)} className="p-1.5 rounded-lg text-gray-300 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"><FiEdit2 size={14} /></button>
-                                <button onClick={() => handleDelete(p.id)} className="p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors"><FiTrash2 size={14} /></button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))
-                      }
-                    </tbody>
-                  </table>
+                  <div className="space-y-3 py-3">
+                    {[
+                      'Upgrade to premium to reduce UVEA escrow fees by 1.05%.',
+                      'Your gaming keyboards conversion is high. Consider increasing stock count.',
+                      'Filing delivery notices under 24 hours will improve your average rating.',
+                    ].map((tip, index) => (
+                      <div key={index} className="flex gap-2.5 items-start">
+                        <div className="w-5 h-5 rounded-full bg-yellow-50 flex items-center justify-center shrink-0 text-yellow-600 text-xs font-bold mt-0.5">
+                          {index + 1}
+                        </div>
+                        <p className="text-[11px] text-gray-600 leading-relaxed">{tip}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <button 
+                    onClick={() => handleTabChange('retinaview')}
+                    className="w-full py-2.5 rounded-xl border border-blue-100 hover:bg-blue-50 text-blue-600 font-bold text-xs text-center transition-colors"
+                  >
+                    Open Full Analytics
+                  </button>
                 </div>
               </div>
             </div>
           )}
 
-          {/* ── ORDERS ── */}
-          {tab === 'orders' && (
-            <div>
-              {/* Status summary */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                {[
-                  { label: 'Pending',    count: MOCK_ORDERS.filter(o => o.status === 'pending').length,    color: 'bg-yellow-50 text-yellow-600 border-yellow-100' },
-                  { label: 'Processing', count: MOCK_ORDERS.filter(o => o.status === 'processing').length, color: 'bg-blue-50 text-blue-600 border-blue-100' },
-                  { label: 'Shipped',    count: MOCK_ORDERS.filter(o => o.status === 'shipped').length,    color: 'bg-indigo-50 text-indigo-600 border-indigo-100' },
-                  { label: 'Delivered',  count: MOCK_ORDERS.filter(o => o.status === 'delivered').length,  color: 'bg-green-50 text-green-600 border-green-100' },
-                ].map(s => (
-                  <div key={s.label} className={`rounded-2xl border p-4 text-center ${s.color}`}>
-                    <p className="text-3xl font-black">{s.count}</p>
-                    <p className="text-xs font-semibold mt-1">{s.label}</p>
-                  </div>
-                ))}
+          {/* ── TABS 2: PRODUCT LISTINGS MANAGER ── */}
+          {tab === 'listings' && (
+            <div className="space-y-6 animate-fade-in">
+              <div className="flex border-b border-gray-100">
+                <button onClick={() => setListingsTab('active')} className={`pb-3 px-5 text-xs font-bold border-b-2 transition-colors ${listingsTab === 'active' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-400 hover:text-gray-600'}`}>
+                  Active Inventory ({products.length})
+                </button>
               </div>
 
-              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-                  <p className="font-bold text-gray-900">All Orders</p>
-                  <span className="text-xs text-gray-400">{MOCK_ORDERS.length} orders</span>
-                </div>
+              <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
                 <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead className="bg-gray-50 border-b border-gray-100">
+                  <table className="w-full text-xs text-left">
+                    <thead className="bg-slate-50 border-b border-gray-100">
                       <tr>
-                        {['Order ID', 'Customer', 'Date', 'Items', 'Total', 'Status', 'Update'].map(h => (
-                          <th key={h} className="text-left py-3 px-4 text-xs text-gray-400 font-semibold">{h}</th>
+                        {['Listing Item', 'Price', 'Stock Level', 'Performance (Views/Sales)', 'Delivery Time', 'Actions'].map(h => (
+                          <th key={h} className="py-3.5 px-5 text-slate-400 uppercase font-black tracking-wider text-[10px]">{h}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
-                      {MOCK_ORDERS.map(o => (
-                        <tr key={o.id} className="border-b border-gray-50 last:border-0 hover:bg-gray-50/70 transition-colors">
-                          <td className="py-3.5 px-4 font-mono text-blue-600 font-bold text-xs">{o.id}</td>
-                          <td className="py-3.5 px-4">
-                            <div className="flex items-center gap-2">
-                              <div className="w-7 h-7 rounded-lg bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-xs shrink-0">
-                                {o.customer[0]}
+                      {products.map(p => (
+                        <tr key={p.id} className="border-b border-gray-50 last:border-0 hover:bg-slate-50/50 transition-colors">
+                          <td className="py-4 px-5">
+                            <div className="flex items-center gap-3">
+                              <img src={p.images[0]} alt={p.name} className="w-12 h-12 rounded-xl object-cover border border-gray-100 shadow-inner" />
+                              <div>
+                                <p className="font-bold text-gray-900 text-xs line-clamp-1 max-w-[180px]">{p.name}</p>
+                                <p className="text-[10px] text-gray-400 font-semibold mt-0.5">{p.category}</p>
                               </div>
-                              <span className="text-xs font-medium text-gray-800">{o.customer}</span>
                             </div>
                           </td>
-                          <td className="py-3.5 px-4 text-xs text-gray-400">{o.date}</td>
-                          <td className="py-3.5 px-4 text-xs text-gray-500">{o.items} item{o.items > 1 ? 's' : ''}</td>
-                          <td className="py-3.5 px-4 text-sm font-bold text-gray-900">{fmt(o.total)}</td>
-                          <td className="py-3.5 px-4">
-                            <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold border ${
-                              o.status === 'delivered'  ? 'bg-green-50 text-green-600 border-green-100' :
-                              o.status === 'shipped'    ? 'bg-blue-50 text-blue-600 border-blue-100' :
-                              o.status === 'processing' ? 'bg-indigo-50 text-indigo-600 border-indigo-100' :
-                              'bg-yellow-50 text-yellow-600 border-yellow-100'
-                            }`}>
-                              {STATUS_ICON[o.status]} {o.status}
+                          <td className="py-4 px-5 font-bold text-gray-900">₦{p.price.toLocaleString('en-NG')}</td>
+                          <td className="py-4 px-5">
+                            <span className={`px-2.5 py-1 rounded-full font-bold text-[9px] uppercase tracking-wider ${p.stock === 0 ? 'bg-red-50 text-red-500' : p.stock < 10 ? 'bg-orange-50 text-orange-500' : 'bg-green-50 text-green-600'}`}>
+                              {p.stock === 0 ? 'Out of stock' : `${p.stock} units`}
                             </span>
                           </td>
-                          <td className="py-3.5 px-4">
-                            <select defaultValue={o.status}
-                              onChange={e => addToast(`Order ${o.id} updated to ${e.target.value}`)}
-                              className="text-xs px-2.5 py-1.5 rounded-lg border border-gray-200 bg-white outline-none focus:border-blue-500 cursor-pointer">
-                              {['pending', 'processing', 'shipped', 'delivered'].map(s => (
-                                <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
-                              ))}
-                            </select>
+                          <td className="py-4 px-5 font-semibold text-gray-500">
+                            👁️ {p.views} views · 🛍️ {p.ordersCount} sales
+                          </td>
+                          <td className="py-4 px-5 font-semibold text-slate-500">{p.deliveryTime || '1-2 Days'}</td>
+                          <td className="py-4 px-5">
+                            <div className="flex gap-2">
+                              <button onClick={() => openEdit(p)} className="p-2 rounded-xl bg-slate-50 text-gray-400 hover:text-blue-600 transition-colors"><FiEdit2 size={13} /></button>
+                              <button onClick={() => setDeleteConfirmId(p.id)} className="p-2 rounded-xl bg-slate-50 text-gray-400 hover:text-red-500 transition-colors"><FiTrash2 size={13} /></button>
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -472,99 +424,310 @@ export default function SellerDashboard() {
             </div>
           )}
 
-          {/* ── ANALYTICS ── */}
-          {tab === 'analytics' && (
-            <div className="space-y-6">
-              <div className="grid md:grid-cols-2 gap-4">
-                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-                  <p className="font-bold text-gray-900 mb-1">Revenue by Month</p>
-                  <p className="text-xs text-gray-400 mb-5">Naira (₦)</p>
-                  <ResponsiveContainer width="100%" height={240}>
-                    <AreaChart data={SELLER_ANALYTICS.revenue}>
-                      <defs>
-                        <linearGradient id="aGrad" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#2563EB" stopOpacity={0.15} />
-                          <stop offset="95%" stopColor="#2563EB" stopOpacity={0} />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#F3F4F6" vertical={false} />
-                      <XAxis dataKey="month" tick={{ fill: '#9CA3AF', fontSize: 11 }} axisLine={false} tickLine={false} />
-                      <YAxis tick={{ fill: '#9CA3AF', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => `₦${(v/1000).toFixed(0)}k`} />
-                      <Tooltip formatter={v => [fmt(v), 'Revenue']} contentStyle={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: 12, fontSize: 12 }} />
-                      <Area type="monotone" dataKey="value" stroke="#2563EB" strokeWidth={2.5} fill="url(#aGrad)" dot={false} activeDot={{ r: 5 }} />
-                    </AreaChart>
-                  </ResponsiveContainer>
+          {/* ── TABS 3: ESCROW ORDERS QUEUE ── */}
+          {tab === 'orders' && (
+            <div className="space-y-6 animate-fade-in">
+              <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+                <div className="px-5 py-4 border-b border-gray-50 bg-slate-50/50">
+                  <h3 className="text-xs font-black text-gray-950 uppercase tracking-wider">Secure Escrow Orders</h3>
                 </div>
-                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-                  <p className="font-bold text-gray-900 mb-1">Orders by Month</p>
-                  <p className="text-xs text-gray-400 mb-5">Number of orders</p>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs text-left">
+                    <thead className="bg-slate-50 border-b border-gray-100">
+                      <tr>
+                        {['Order Code', 'Buyer & Address', 'Total Price', 'Status', 'Escrow State', 'Update Actions'].map(h => (
+                          <th key={h} className="py-3.5 px-5 text-slate-400 uppercase font-black tracking-wider text-[10px]">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {[
+                        { id: 'RKT-1042', customer: 'Chidi Okonkwo', address: 'Victoria Island, Lagos', date: '2026-03-20', total: 73000, status: 'shipped', escrow: 'held' },
+                        { id: 'RKT-1038', customer: 'Ngozi Eze', address: 'Garki, Abuja', date: '2026-03-18', total: 95000, status: 'delivered', escrow: 'held' },
+                        { id: 'RKT-1031', customer: 'Emeka Obiora', address: 'Wuse, Abuja', date: '2026-03-15', total: 8500, status: 'processing', escrow: 'held' },
+                        { id: 'RKT-1025', customer: 'Funmilayo Bello', address: 'Lekki Phase 1, Lagos', date: '2026-03-12', total: 85000, status: 'pending', escrow: 'pending' },
+                      ].map(o => (
+                        <tr key={o.id} className="border-b border-gray-50 last:border-0 hover:bg-slate-50/50 transition-colors">
+                          <td className="py-4 px-5 font-mono font-black text-blue-600">{o.id}</td>
+                          <td className="py-4 px-5">
+                            <p className="font-bold text-gray-950">{o.customer}</p>
+                            <p className="text-[10px] text-gray-400 mt-0.5">{o.address}</p>
+                          </td>
+                          <td className="py-4 px-5 font-black text-gray-900">₦{o.total.toLocaleString('en-NG')}</td>
+                          <td className="py-4 px-5">
+                            <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[9px] font-bold border uppercase tracking-wider ${
+                              o.status === 'delivered' ? 'bg-emerald-50 text-emerald-500 border-emerald-100' : 'bg-slate-100 text-slate-500'
+                            }`}>
+                              {STATUS_ICON[o.status] || <FiClock size={12} />} {o.status}
+                            </span>
+                          </td>
+                          <td className="py-4 px-5">
+                            <span className={`px-2 py-0.5 rounded font-bold text-[9px] uppercase tracking-wider ${
+                              o.escrow === 'held' ? 'bg-blue-100 text-blue-600' : 'bg-amber-100 text-amber-600'
+                            }`}>
+                              UVEA {o.escrow}
+                            </span>
+                          </td>
+                          <td className="py-4 px-5">
+                            {o.status !== 'delivered' && o.status !== 'completed' && (
+                              <button 
+                                onClick={() => setDeliveryOrderId(o.id)}
+                                className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-[10px] uppercase tracking-wider shadow-sm"
+                              >
+                                Mark Delivered
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ── TABS 4: EARNINGS & PAYOUT ── */}
+          {tab === 'earnings' && (
+            <div className="space-y-6 animate-fade-in">
+              <div className="grid sm:grid-cols-3 gap-4">
+                {[
+                  { label: 'Available Balance', value: fmt(sellerMetrics.balance), action: () => setPayoutModalOpen(true), btnLabel: 'Withdraw to Bank' },
+                  { label: 'Pending UVEA Escrow', value: fmt(sellerMetrics.pendingPayouts), detail: 'Funds held in customer escrow locks' },
+                  { label: 'Escrow Fee Exemption', value: isFree ? 'None (+1.05%)' : '0.00% Premium', detail: isFree ? 'Standard fees apply' : 'VIP member benefits active' },
+                ].map((card, idx) => (
+                  <div key={idx} className="bg-white rounded-3xl border border-gray-100 p-6 flex flex-col justify-between h-40 shadow-sm">
+                    <div>
+                      <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">{card.label}</p>
+                      <p className="text-2xl font-black text-gray-900 mt-2">{card.value}</p>
+                    </div>
+                    {card.action ? (
+                      <button onClick={card.action} className="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-sm">
+                        {card.btnLabel}
+                      </button>
+                    ) : (
+                      <p className="text-[10px] text-gray-400">{card.detail}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {/* Payout History logs */}
+              <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+                <div className="px-5 py-4 border-b border-gray-50 bg-slate-50/50">
+                  <h3 className="text-xs font-black text-gray-950 uppercase tracking-wider">Payout History Logs</h3>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs text-left">
+                    <thead className="bg-slate-50 border-b border-gray-100">
+                      <tr>
+                        {['Date', 'Reference ID', 'Amount Received', 'Status'].map(h => (
+                          <th key={h} className="py-3.5 px-5 text-slate-400 uppercase font-black tracking-wider text-[10px]">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sellerMetrics.payoutHistory.map((h, i) => (
+                        <tr key={i} className="border-b border-gray-50 last:border-0 hover:bg-slate-50/50 transition-colors">
+                          <td className="py-4 px-5 text-gray-500">{h.date}</td>
+                          <td className="py-4 px-5 font-mono text-gray-700">{h.reference}</td>
+                          <td className="py-4 px-5 font-bold text-gray-900">₦{h.amount.toLocaleString('en-NG')}</td>
+                          <td className="py-4 px-5">
+                            <span className={`px-2 py-0.5 rounded font-bold text-[9px] uppercase tracking-wider ${
+                              h.status === 'Completed' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
+                            }`}>
+                              {h.status}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ── TABS 5: RETINAview ANALYTICS ── */}
+          {tab === 'retinaview' && (
+            <div className="space-y-6 animate-fade-in">
+              {/* RETINAview sub tabs navigation */}
+              <div className="flex border-b border-gray-100 overflow-x-auto pb-0.5">
+                {[
+                  { id: 'overview', label: 'Metric Overview' },
+                  { id: 'revenue', label: 'Revenue Trends' },
+                  { id: 'products', label: 'Conversion Rates' },
+                  { id: 'customers', label: 'Retention & Hours' },
+                  { id: 'performance', label: 'UVEA Release Rates' },
+                ].map(sub => (
+                  <button 
+                    key={sub.id} 
+                    onClick={() => setAnalyticsTab(sub.id)}
+                    className={`pb-3 px-5 text-xs font-bold shrink-0 border-b-2 transition-colors ${analyticsTab === sub.id ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
+                  >
+                    {sub.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Subtab Overview */}
+              {analyticsTab === 'overview' && (
+                <div className="space-y-6">
+                  {/* Overview summary cards */}
+                  <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+                    {[
+                      { label: 'Total Orders', value: '184' },
+                      { label: 'Gross Margin', value: '₦4.8M' },
+                      { label: 'Avg Buyer Review', value: '4.8★' },
+                      { label: 'Dispute Rate', value: '0.54%' },
+                      { label: 'Referral Traffic', value: '1,240 clicks' },
+                    ].map((card, idx) => (
+                      <div key={idx} className="bg-white rounded-2xl border border-gray-100 p-4 text-center">
+                        <p className="text-lg font-black text-gray-950">{card.value}</p>
+                        <p className="text-[9px] text-gray-400 font-bold uppercase tracking-wider mt-1">{card.label}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Core Chart widgets */}
+                  <div className="bg-white rounded-3xl border border-gray-100 p-5 shadow-sm">
+                    <div className="mb-4">
+                      <h4 className="text-xs font-black text-gray-950 uppercase tracking-wider">Overview Growth Metrics</h4>
+                    </div>
+                    <ResponsiveContainer width="100%" height={240}>
+                      <AreaChart data={SELLER_ANALYTICS.revenue}>
+                        <defs>
+                          <linearGradient id="premiumChart" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#2563EB" stopOpacity={0.2} />
+                            <stop offset="95%" stopColor="#2563EB" stopOpacity={0} />
+                          </linearGradient>
+                        </defs>
+                        <XAxis dataKey="month" />
+                        <YAxis />
+                        <Tooltip />
+                        <Area type="monotone" dataKey="value" stroke="#2563EB" fillOpacity={1} fill="url(#premiumChart)" strokeWidth={2.5} />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              )}
+
+              {/* Subtab Revenue */}
+              {analyticsTab === 'revenue' && (
+                <div className="bg-white rounded-3xl border border-gray-100 p-5 shadow-sm space-y-4">
+                  <div>
+                    <h4 className="text-xs font-black text-gray-950 uppercase tracking-wider">Revenue & Net After Fees (Monthly)</h4>
+                  </div>
                   <ResponsiveContainer width="100%" height={240}>
-                    <BarChart data={SELLER_ANALYTICS.orders}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#F3F4F6" vertical={false} />
-                      <XAxis dataKey="month" tick={{ fill: '#9CA3AF', fontSize: 11 }} axisLine={false} tickLine={false} />
-                      <YAxis tick={{ fill: '#9CA3AF', fontSize: 11 }} axisLine={false} tickLine={false} />
-                      <Tooltip contentStyle={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: 12, fontSize: 12 }} />
-                      <Bar dataKey="value" fill="#6366F1" radius={[6, 6, 0, 0]} />
+                    <BarChart data={SELLER_ANALYTICS.revenue}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="month" />
+                      <YAxis />
+                      <Tooltip />
+                      <Legend />
+                      <Bar dataKey="value" name="Gross Revenue" fill="#2563EB" radius={[4, 4, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
-              </div>
-              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-                <p className="font-bold text-gray-900 mb-5">Product Performance</p>
-                <div className="space-y-4">
-                  {SELLER_ANALYTICS.topProducts.map((p, i) => {
-                    const max = SELLER_ANALYTICS.topProducts[0].revenue;
-                    return (
-                      <div key={p.name} className="flex items-center gap-4">
-                        <span className="w-6 text-xs text-gray-400 font-bold shrink-0">#{i + 1}</span>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between mb-1.5">
-                            <span className="text-sm font-semibold text-gray-800 truncate">{p.name}</span>
-                            <span className="text-sm font-bold text-blue-600 shrink-0 ml-2">{fmt(p.revenue)}</span>
+              )}
+
+              {/* Subtab Products (Conversion View) */}
+              {analyticsTab === 'products' && (
+                <div className="bg-white rounded-3xl border border-gray-100 p-5 shadow-sm space-y-4">
+                  <div>
+                    <h4 className="text-xs font-black text-gray-950 uppercase tracking-wider">Views vs Purchase Conversions</h4>
+                  </div>
+                  <div className="space-y-4">
+                    {products.map(p => {
+                      const conversion = ((p.ordersCount / p.views) * 100).toFixed(1);
+                      return (
+                        <div key={p.id} className="space-y-1">
+                          <div className="flex justify-between text-xs font-semibold">
+                            <span className="text-gray-800">{p.name}</span>
+                            <span className="text-blue-600 font-bold">{conversion}% conversion</span>
                           </div>
-                          <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                            <div className="h-full bg-gradient-to-r from-blue-500 to-blue-600 rounded-full" style={{ width: `${(p.revenue / max) * 100}%` }} />
+                          <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                            <div className="h-full bg-blue-600 rounded-full" style={{ width: `${Math.min(Number(conversion) * 3, 100)}%` }} />
                           </div>
-                          <p className="text-[11px] text-gray-400 mt-1">{p.sales} units sold</p>
+                          <p className="text-[9px] text-gray-400">{p.views} views · {p.ordersCount} completed purchases</p>
                         </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Subtab Customers */}
+              {analyticsTab === 'customers' && (
+                <div className="grid md:grid-cols-2 gap-6">
+                  {/* Peak order hours */}
+                  <div className="bg-white rounded-3xl border border-gray-100 p-5 shadow-sm space-y-4">
+                    <h4 className="text-xs font-black text-gray-950 uppercase tracking-wider">Peak Order Hours (Daily)</h4>
+                    <ResponsiveContainer width="100%" height={200}>
+                      <LineChart data={[
+                        { hour: '8 AM', orders: 12 }, { hour: '12 PM', orders: 48 }, { hour: '4 PM', orders: 32 },
+                        { hour: '8 PM', orders: 84 }, { hour: '11 PM', orders: 96 }, { hour: '3 AM', orders: 8 }
+                      ]}>
+                        <XAxis dataKey="hour" />
+                        <YAxis />
+                        <Tooltip />
+                        <Line type="monotone" dataKey="orders" stroke="#7C3AED" strokeWidth={2} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                  
+                  {/* Return rate */}
+                  <div className="bg-white rounded-3xl border border-gray-100 p-5 shadow-sm flex flex-col justify-between">
+                    <div>
+                      <h4 className="text-xs font-black text-gray-950 uppercase tracking-wider mb-4">Customer Segment Retention</h4>
+                      <p className="text-2xl font-black text-gray-950">64.5%</p>
+                      <p className="text-xs text-gray-400 mt-1">Repeat buyer retention rate (last 90 days)</p>
+                    </div>
+                    <div className="p-4 bg-purple-50/50 rounded-2xl text-[10px] text-purple-700 leading-relaxed border border-purple-100">
+                      🌟 Retained customers have generated ₦840,000 in gross escrow payments over this period.
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Subtab Performance */}
+              {analyticsTab === 'performance' && (
+                <div className="bg-white rounded-3xl border border-gray-100 p-5 shadow-sm space-y-4">
+                  <h4 className="text-xs font-black text-gray-950 uppercase tracking-wider">UVEA Auto-Release Timeline Compliance</h4>
+                  <div className="grid sm:grid-cols-3 gap-4">
+                    {[
+                      { label: 'On-Time Dispatch Rate', val: '98.2%' },
+                      { label: 'Auto-Release Triggers', val: '2 cases' },
+                      { label: 'Escrow Frozen Disputes', val: '0 cases' }
+                    ].map((m, idx) => (
+                      <div key={idx} className="p-4 bg-slate-50 border border-gray-100 rounded-2xl text-center">
+                        <p className="text-lg font-black text-gray-950">{m.val}</p>
+                        <p className="text-[10px] text-gray-400 font-semibold mt-1">{m.label}</p>
                       </div>
-                    );
-                  })}
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           )}
 
-          {/* ── MESSAGES ── */}
-          {tab === 'messages' && (
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 text-center">
-              <FiMessageCircle size={40} className="text-blue-200 mx-auto mb-4" />
-              <p className="font-bold text-gray-900 mb-2">Seller Messages</p>
-              <p className="text-gray-400 text-sm mb-5">Manage all your customer conversations</p>
-              <Link to="/messages" className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-blue-600 text-white font-semibold text-sm hover:bg-blue-700 transition-colors">
-                Open Messages
-              </Link>
-            </div>
-          )}
-
-          {/* ── SETTINGS ── */}
+          {/* ── TABS 6: SETTINGS ── */}
           {tab === 'settings' && (
-            <div className="max-w-2xl space-y-5">
-              {[
-                { title: 'Store Name', value: 'Chukwuemeka Gadgets', type: 'text' },
-                { title: 'Contact Email', value: 'chukwuemeka@gmail.com', type: 'email' },
-                { title: 'Phone Number', value: '+234 803 456 7890', type: 'tel' },
-                { title: 'Store Location', value: 'Lagos Island, Lagos', type: 'text' },
-              ].map(f => (
-                <div key={f.title} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-                  <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-2">{f.title}</label>
-                  <input type={f.type} defaultValue={f.value}
-                    className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 text-sm text-gray-900 outline-none focus:border-blue-500 focus:bg-white transition-colors" />
-                </div>
-              ))}
-              <button onClick={() => addToast('Settings saved!')}
-                className="px-6 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm transition-colors shadow-sm">
-                Save Changes
+            <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-6 max-w-2xl space-y-5 animate-fade-in">
+              <h3 className="text-xs font-black text-gray-900 uppercase tracking-wider border-b border-gray-50 pb-3">Edit Public Profile Details</h3>
+              <div className="grid sm:grid-cols-2 gap-4">
+                {[
+                  { label: 'Store Bio / Tagline', key: 'bio', value: 'Premium gadgets verified vendor in Lagos' },
+                  { label: 'Physical Dispatch Office', key: 'address', value: 'No 4 Hostels, Campus Mall, Lagos' },
+                ].map(field => (
+                  <div key={field.key} className="col-span-2">
+                    <label className="text-[10px] text-gray-400 font-bold block mb-1 uppercase">{field.label}</label>
+                    <input type="text" defaultValue={field.value} className={inputCls} />
+                  </div>
+                ))}
+              </div>
+              <button onClick={() => addToast('Seller profile saved successfully')} className="px-6 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs transition-colors shadow-sm">
+                Save Public Profile
               </button>
             </div>
           )}
@@ -572,34 +735,190 @@ export default function SellerDashboard() {
         </main>
       </div>
 
-      {/* Product Modal */}
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editProduct ? 'Edit Product' : 'Add New Product'}>
+      {/* Listing Create/Edit Modal */}
+      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editProduct ? 'Modify Listing Details' : 'Create Custom Listing'}>
         <div className="space-y-4">
-          {[['name', 'Product Name', 'text'], ['price', 'Price (₦)', 'number'], ['stock', 'Stock Quantity', 'number'], ['category', 'Category', 'text']].map(([k, label, type]) => (
-            <div key={k}>
-              <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5 block">{label}</label>
-              <input type={type} value={form[k]} onChange={e => setForm(f => ({ ...f, [k]: e.target.value }))}
-                placeholder={label} className={inputCls} />
-            </div>
-          ))}
           <div>
-            <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5 block">Description</label>
-            <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
-              rows={3} placeholder="Describe your product..."
-              className="w-full px-3 py-2.5 rounded-xl text-sm border border-gray-200 bg-gray-50 text-gray-900 outline-none resize-none focus:border-blue-500 transition-colors" />
+            <label className="text-[10px] text-gray-400 font-bold block mb-1 uppercase">Item Name</label>
+            <input type="text" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Headphones, Shirt, etc." className={inputCls} />
           </div>
-          <div className="flex gap-3 pt-1">
-            <button onClick={() => setModalOpen(false)}
-              className="flex-1 py-3 rounded-xl border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors">
-              Cancel
-            </button>
-            <button onClick={handleSave} disabled={!form.name || !form.price}
-              className="flex-1 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm disabled:opacity-50 transition-colors shadow-sm">
-              {editProduct ? 'Save Changes' : 'Create Product'}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-[10px] text-gray-400 font-bold block mb-1 uppercase">Price (₦)</label>
+              <input type="number" value={form.price} onChange={e => setForm(f => ({ ...f, price: e.target.value }))} placeholder="₦..." className={inputCls} />
+            </div>
+            <div>
+              <label className="text-[10px] text-gray-400 font-bold block mb-1 uppercase">Stock Count</label>
+              <input type="number" value={form.stock} onChange={e => setForm(f => ({ ...f, stock: e.target.value }))} placeholder="Stock level" className={inputCls} />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-[10px] text-gray-400 font-bold block mb-1 uppercase">Category</label>
+              <select value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} className="w-full px-3 py-2.5 rounded-xl text-sm border border-gray-200 bg-gray-50 outline-none focus:border-blue-500">
+                <option>Electronics</option>
+                <option>Fashion</option>
+                <option>Home & Garden</option>
+                <option>Sports</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-[10px] text-gray-400 font-bold block mb-1 uppercase">Delivery Frame</label>
+              <select value={form.deliveryTime} onChange={e => setForm(f => ({ ...f, deliveryTime: e.target.value }))} className="w-full px-3 py-2.5 rounded-xl text-sm border border-gray-200 bg-gray-50 outline-none focus:border-blue-500">
+                <option>Same Day</option>
+                <option>1-2 Days</option>
+                <option>3-5 Days</option>
+              </select>
+            </div>
+          </div>
+          <div>
+            <label className="text-[10px] text-gray-400 font-bold block mb-1 uppercase">Product Description</label>
+            <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} rows={2} placeholder="Describe product details..." className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-xs outline-none resize-none focus:bg-white focus:border-blue-500" />
+          </div>
+          <div className="flex gap-2.5 pt-2">
+            <button onClick={() => setModalOpen(false)} className="flex-1 py-3 rounded-xl border border-gray-200 text-xs font-semibold text-gray-500 hover:bg-gray-50 transition-colors">Cancel</button>
+            <button onClick={handleSave} disabled={!form.name || !form.price} className="flex-1 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs disabled:opacity-50 transition-all shadow-md shadow-blue-50">
+              {editProduct ? 'Update Listing' : 'Publish Listing'}
             </button>
           </div>
         </div>
       </Modal>
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirmId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-3xl border border-gray-100 shadow-2xl p-6 max-w-sm w-full text-center animate-fade-in">
+            <div className="w-12 h-12 rounded-full bg-red-50 text-red-500 flex items-center justify-center mx-auto mb-3">
+              <FiAlertCircle size={24} />
+            </div>
+            <h4 className="font-bold text-gray-900 text-sm">Delete Product Listing?</h4>
+            <p className="text-gray-400 text-xs leading-relaxed mt-1 mb-5">
+              This action cannot be undone. Any active buyer escrows targeting this specific item listing will remain unaffected.
+            </p>
+            <div className="flex gap-2">
+              <button onClick={() => setDeleteConfirmId(null)} className="flex-1 py-2.5 rounded-xl border border-gray-200 text-xs font-bold text-gray-500 hover:bg-gray-50 transition-colors">
+                Cancel
+              </button>
+              <button onClick={() => handleDeleteListing(deleteConfirmId)} className="flex-1 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white font-bold text-xs transition-colors shadow-md shadow-red-50">
+                Confirm Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Mark Delivered Modal */}
+      {deliveryOrderId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-3xl border border-gray-100 shadow-2xl p-6 max-w-sm w-full text-center animate-fade-in">
+            <div className="w-12 h-12 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center mx-auto mb-3">
+              <FiTruck size={24} />
+            </div>
+            <h4 className="font-bold text-gray-900 text-sm">Mark Order Delivered?</h4>
+            <p className="text-gray-400 text-xs leading-relaxed mt-1 mb-5">
+              This triggers the 48-hour buyer verification countdown. If the buyer doesn't dispute or confirm within 48h, escrow release completes automatically.
+            </p>
+            <div className="flex gap-2">
+              <button onClick={() => setDeliveryOrderId(null)} className="flex-1 py-2.5 rounded-xl border border-gray-200 text-xs font-bold text-gray-500 hover:bg-gray-50 transition-colors">
+                Cancel
+              </button>
+              <button onClick={handleMarkAsDelivered} className="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs transition-colors shadow-md shadow-blue-50">
+                Yes, Delivered
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Payout Bank Details Modal */}
+      {payoutModalOpen && (
+        <Modal open={payoutModalOpen} onClose={() => setPayoutModalOpen(false)} title="Request Payout Withdrawal">
+          <div className="space-y-4">
+            <div>
+              <label className="text-[10px] text-gray-400 font-bold block mb-1 uppercase">Select Nigerian Bank</label>
+              <select 
+                value={payoutForm.bankName} 
+                onChange={e => setPayoutForm(f => ({ ...f, bankName: e.target.value }))}
+                className="w-full px-3 py-2.5 rounded-xl text-sm border border-gray-200 bg-gray-50 outline-none focus:border-blue-500"
+              >
+                <option>Access Bank</option>
+                <option>GTBank</option>
+                <option>Zenith Bank</option>
+                <option>OPay / PalmPay</option>
+                <option>United Bank for Africa (UBA)</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-[10px] text-gray-400 font-bold block mb-1 uppercase">10-Digit NUBAN Account Number</label>
+              <input 
+                type="text" 
+                maxLength={10}
+                value={payoutForm.accountNumber} 
+                onChange={e => setPayoutForm(f => ({ ...f, accountNumber: e.target.value }))} 
+                placeholder="0012345678" 
+                className={inputCls} 
+              />
+            </div>
+            <div>
+              <label className="text-[10px] text-gray-400 font-bold block mb-1 uppercase">Account Name</label>
+              <input 
+                type="text" 
+                value={payoutForm.accountName} 
+                onChange={e => setPayoutForm(f => ({ ...f, accountName: e.target.value }))} 
+                placeholder="Receiver Account Name" 
+                className={inputCls} 
+              />
+            </div>
+            <div>
+              <label className="text-[10px] text-gray-400 font-bold block mb-1 uppercase">Withdrawal Amount (₦)</label>
+              <input 
+                type="number" 
+                value={payoutForm.amount} 
+                onChange={e => setPayoutForm(f => ({ ...f, amount: e.target.value }))} 
+                placeholder={`Max Available: ₦${sellerMetrics.balance.toLocaleString('en-NG')}`} 
+                className={inputCls} 
+              />
+            </div>
+            <div className="flex gap-2.5 pt-2">
+              <button onClick={() => setPayoutModalOpen(false)} className="flex-1 py-3 rounded-xl border border-gray-200 text-xs font-semibold text-gray-500 hover:bg-gray-50 transition-colors">Cancel</button>
+              <button 
+                onClick={submitPayout} 
+                disabled={!payoutForm.accountNumber || !payoutForm.accountName || !payoutForm.amount} 
+                className="flex-1 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs disabled:opacity-50 transition-all shadow-md shadow-blue-50"
+              >
+                Confirm Payout
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Upgrade Limit Prompt Modal (Paywall modal context) */}
+      {showUpgradePrompt && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-3xl border border-gray-100 shadow-2xl p-6 max-w-sm w-full text-center animate-fade-in">
+            <div className="w-12 h-12 rounded-full bg-amber-50 text-amber-500 flex items-center justify-center mx-auto mb-3">
+              <FiLock size={22} />
+            </div>
+            <h4 className="font-bold text-gray-900 text-sm">Premium Feature Locked</h4>
+            <p className="text-gray-400 text-xs leading-relaxed mt-1 mb-5">
+              {upgradeReason} Upgrade your subscription tier to access full metrics and RETINAview analytics reports.
+            </p>
+            <div className="flex flex-col gap-2">
+              <button 
+                onClick={() => { setShowUpgradePrompt(false); setTab('overview'); navigate('/profile'); }}
+                className="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md shadow-blue-50"
+              >
+                Go to Plans Settings
+              </button>
+              <button onClick={() => setShowUpgradePrompt(false)} className="w-full py-2.5 rounded-xl border border-gray-200 text-xs font-bold text-gray-500 hover:bg-gray-50">
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

@@ -15,10 +15,10 @@ const SORT_OPTIONS = [
 ];
 
 const PRICE_RANGES = [
-  { label: 'Under ₦50',    min: '', max: '50' },
-  { label: '₦50 – ₦100',  min: '50', max: '100' },
-  { label: '₦100 – ₦250', min: '100', max: '250' },
-  { label: 'Over ₦250',   min: '250', max: '' },
+  { label: 'Under ₦10,000',    min: '', max: '10000' },
+  { label: '₦10,000 – ₦50,000',  min: '10000', max: '50000' },
+  { label: '₦50,000 – ₦100,000', min: '50000', max: '100000' },
+  { label: 'Over ₦100,000',   min: '100000', max: '' },
 ];
 
 export default function Products() {
@@ -34,6 +34,7 @@ export default function Products() {
     minPrice: '',
     maxPrice: '',
     minRating: '',
+    deliveryTime: '',
     inStock: false,
     sort: searchParams.get('sort') || 'newest',
   });
@@ -63,12 +64,12 @@ export default function Products() {
 
   const updateFilter = (key, val) => setFilters(f => ({ ...f, [key]: val }));
   const clearFilters = () => {
-    setFilters({ search: '', category: '', minPrice: '', maxPrice: '', minRating: '', inStock: false, sort: 'newest' });
+    setFilters({ search: '', category: '', minPrice: '', maxPrice: '', minRating: '', deliveryTime: '', inStock: false, sort: 'newest' });
     setSearchInput('');
     setSearchParams({});
   };
 
-  const activeFilterCount = [filters.category, filters.minPrice, filters.maxPrice, filters.minRating, filters.inStock].filter(Boolean).length;
+  const activeFilterCount = [filters.category, filters.minPrice, filters.maxPrice, filters.minRating, filters.deliveryTime, filters.inStock].filter(Boolean).length;
 
   const FilterPanel = () => (
     <div className="space-y-7">
@@ -122,6 +123,18 @@ export default function Products() {
             <button key={r} onClick={() => updateFilter('minRating', filters.minRating == r ? '' : r)}
               className={`px-3 py-1.5 rounded-xl text-sm border transition-colors ${filters.minRating == r ? 'border-blue-600 bg-blue-50 text-blue-600 font-semibold' : 'border-gray-200 text-gray-600 hover:border-gray-300'}`}>
               {r}★ & up
+            </button>
+          ))}        </div>
+      </div>
+
+      {/* Delivery Time */}
+      <div>
+        <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Delivery Time</p>
+        <div className="flex gap-2 flex-wrap">
+          {['Same Day', '1-2 Days', '3-5 Days'].map(t => (
+            <button key={t} type="button" onClick={() => updateFilter('deliveryTime', filters.deliveryTime === t ? '' : t)}
+              className={`px-3 py-1.5 rounded-xl text-sm border transition-colors ${filters.deliveryTime === t ? 'border-blue-600 bg-blue-50 text-blue-600 font-semibold' : 'border-gray-200 text-gray-600 hover:border-gray-300'}`}>
+              {t}
             </button>
           ))}
         </div>
@@ -216,7 +229,7 @@ export default function Products() {
             </div>
 
             {/* Active filter chips */}
-            {(filters.category || filters.search || filters.minPrice || filters.maxPrice) && (
+            {(filters.category || filters.search || filters.minPrice || filters.maxPrice || filters.minRating || filters.deliveryTime || filters.inStock) && (
               <div className="flex flex-wrap gap-2 mb-4">
                 {filters.category && (
                   <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 text-blue-600 text-xs font-semibold border border-blue-100">
@@ -235,6 +248,24 @@ export default function Products() {
                   <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 text-blue-600 text-xs font-semibold border border-blue-100">
                     ₦{filters.minPrice || '0'} – ₦{filters.maxPrice || '∞'}
                     <button onClick={() => { updateFilter('minPrice', ''); updateFilter('maxPrice', ''); }}><FiX size={11} /></button>
+                  </span>
+                )}
+                {filters.minRating && (
+                  <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 text-blue-600 text-xs font-semibold border border-blue-100">
+                    {filters.minRating}★ & up
+                    <button onClick={() => updateFilter('minRating', '')} className="hover:text-blue-800"><FiX size={11} /></button>
+                  </span>
+                )}
+                {filters.deliveryTime && (
+                  <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 text-blue-600 text-xs font-semibold border border-blue-100">
+                    {filters.deliveryTime} Delivery
+                    <button onClick={() => updateFilter('deliveryTime', '')} className="hover:text-blue-800"><FiX size={11} /></button>
+                  </span>
+                )}
+                {filters.inStock && (
+                  <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 text-blue-600 text-xs font-semibold border border-blue-100">
+                    In Stock Only
+                    <button onClick={() => updateFilter('inStock', false)} className="hover:text-blue-800"><FiX size={11} /></button>
                   </span>
                 )}
               </div>

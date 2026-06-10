@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AppProvider } from './context/AppContext';
 import Navbar from './components/layout/Navbar';
 import Footer from './components/layout/Footer';
+import BottomTabBar from './components/layout/BottomTabBar';
 import ProtectedRoute from './components/layout/ProtectedRoute';
 import ToastContainer from './components/ui/Toast';
 
@@ -17,13 +18,17 @@ import Sellers from './pages/Sellers';
 import SellerDashboard from './pages/SellerDashboard';
 import AdminDashboard from './pages/AdminDashboard';
 import Profile from './pages/Profile';
+import Subscription from './pages/Subscription';
+import Referrals from './pages/Referrals';
+import About from './pages/About';
 import NotFound from './pages/NotFound';
 
 function Layout({ children }) {
   return (
-    <div className="flex flex-col min-h-screen">
+    <div className="flex flex-col min-h-screen pb-16 lg:pb-0">
       <Navbar />
       <main className="flex-1">{children}</main>
+      <BottomTabBar />
       <Footer />
     </div>
   );
@@ -41,6 +46,7 @@ export default function App() {
           <Route path="/products/:id" element={<Layout><ProductDetail /></Layout>} />
           <Route path="/sellers" element={<Layout><Sellers /></Layout>} />
           <Route path="/cart" element={<Layout><Cart /></Layout>} />
+          <Route path="/about" element={<Layout><About /></Layout>} />
           <Route path="/login" element={<Auth mode="login" />} />
           <Route path="/register" element={<Auth mode="register" />} />
 
@@ -63,6 +69,16 @@ export default function App() {
           <Route path="/profile" element={
             <ProtectedRoute>
               <Layout><Profile /></Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/subscription" element={
+            <ProtectedRoute>
+              <Layout><Subscription /></Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/referrals" element={
+            <ProtectedRoute>
+              <Layout><Referrals /></Layout>
             </ProtectedRoute>
           } />
 
