@@ -1,30 +1,33 @@
 import { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import {
-  FiSearch, FiShoppingCart, FiBell, FiMessageCircle, FiMenu, FiX,
-  FiUser, FiLogOut, FiPackage, FiChevronDown, FiGrid, FiSettings,
-  FiShield, FiTrendingUp, FiGift, FiCreditCard, FiTrash2, FiAlertCircle, FiInfo
+  FiSearch, FiShoppingCart, FiBell, FiMenu, FiX,
+  FiUser, FiLogOut, FiPackage, FiChevronDown, FiGrid, FiCreditCard,
+  FiShield, FiGift, FiTrash2, FiInfo
 } from 'react-icons/fi';
 import { useApp } from '../../context/AppContext';
+import { useAuth } from '../../hooks/useAuth';
+import Logo from '../ui/Logo';
 
 const NAV_LINKS = [
   { to: '/', label: 'Home' },
-  { to: '/products', label: 'Products' },
+  { to: '/products', label: 'Shop' },
   { to: '/sellers', label: 'Sellers' },
+  { to: '/about', label: 'About' },
 ];
 
 export default function Navbar() {
-  const { 
-    user, logout, cartCount, notifications, markNotificationsRead, 
-    unreadMessages, subscription, clearNotifications, deleteNotification,
+  const {
+    user, logout: appLogout, cartCount, notifications, markNotificationsRead,
+    subscription, clearNotifications, deleteNotification,
     notifOpen, setNotifOpen
   } = useApp();
+  const { logout: authLogout } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [userOpen, setUserOpen] = useState(false);
   const [searchVal, setSearchVal] = useState('');
-  const [searchFocused, setSearchFocused] = useState(false);
   const [activeCategory, setActiveCategory] = useState('All');
-  
+
   const navigate = useNavigate();
   const location = useLocation();
   const notifRef = useRef(null);
@@ -33,410 +36,234 @@ export default function Navbar() {
 
   const unreadNotifs = notifications.filter(n => !n.read).length;
 
-  useEffect(() => {
-    setMobileOpen(false);
-  }, [location.pathname]);
+  useEffect(() => { setMobileOpen(false); }, [location.pathname]);
 
   useEffect(() => {
     const handler = (e) => {
-      if (drawerRef.current && drawerRef.current.contains(e.target)) return;
+      if (drawerRef.current?.contains(e.target)) return;
       if (notifRef.current && !notifRef.current.contains(e.target)) setNotifOpen(false);
       if (userRef.current && !userRef.current.contains(e.target)) setUserOpen(false);
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
-  }, []);
+  }, [setNotifOpen]);
 
   const handleSearch = (e) => {
     e.preventDefault();
     if (searchVal.trim()) {
       navigate(`/products?search=${encodeURIComponent(searchVal.trim())}`);
       setSearchVal('');
+      setMobileOpen(false);
     }
+  };
+
+  const handleLogout = async () => {
+    try { await authLogout(); } catch { /* demo mode */ }
+    appLogout();
+    setUserOpen(false);
+    navigate('/');
   };
 
   const isActive = (to) => to === '/' ? location.pathname === '/' : location.pathname.startsWith(to);
 
-  const renderBanner = () => {
-    if (!user) return null;
-    
-    const activePlan = subscription?.plan || 'Free Plan';
-    const trialDaysLeft = subscription?.trialDaysLeft ?? 0;
-    const isExpired = subscription?.isExpired ?? false;
-    
-    if (isExpired) {
-      return (
-        <div className="bg-gradient-to-r from-red-600 to-red-500 text-white text-xs font-semibold py-2.5 px-4 flex items-center justify-between shadow-sm animate-pulse w-full">
-          <div className="flex items-center gap-2 max-w-7xl mx-auto w-full">
-            <span className="bg-white/20 px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider shrink-0">Locked</span>
-            <span className="truncate">Your premium subscription/trial has expired! Seller uploads and analytical features are currently locked.</span>
-            <Link to="/subscription" className="ml-auto bg-white text-red-600 hover:bg-red-50 px-3.5 py-1 rounded-lg text-[10px] font-bold uppercase transition-colors shrink-0">
-              Renew Now
-            </Link>
-          </div>
-        </div>
-      );
-    }
-    
-    if (activePlan === 'Free Plan' && trialDaysLeft > 0) {
-      return (
-        <div className="bg-gradient-to-r from-blue-700 via-indigo-600 to-blue-600 text-white text-xs font-semibold py-2.5 px-4 flex items-center justify-between shadow-sm w-full">
-          <div className="flex items-center gap-2 max-w-7xl mx-auto w-full">
-            <span className="bg-white/20 px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider shrink-0">Trial</span>
-            <span className="truncate">Active Free Trial: <strong>{trialDaysLeft} days remaining</strong>. Enjoy 0% escrow fees and premium listings!</span>
-            <Link to="/subscription" className="ml-auto bg-white text-blue-700 hover:bg-blue-50 px-3.5 py-1 rounded-lg text-[10px] font-bold uppercase transition-colors shrink-0">
-              Upgrade
-            </Link>
-          </div>
-        </div>
-      );
-    }
-    
-    if (activePlan === 'Free Plan') {
-      return (
-        <div className="bg-gradient-to-r from-slate-900 to-slate-800 text-slate-100 text-xs font-semibold py-2.5 px-4 flex items-center justify-between shadow-sm w-full">
-          <div className="flex items-center gap-2 max-w-7xl mx-auto w-full">
-            <span className="bg-amber-400 text-slate-900 px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider shrink-0">Free Plan</span>
-            <span className="truncate">You are on the Free tier. Escrow fees (+1.05%) are charged per checkout transaction. Upgrade to eliminate fees.</span>
-            <Link to="/subscription" className="ml-auto bg-amber-400 hover:bg-amber-300 text-slate-900 px-3.5 py-1 rounded-lg text-[10px] font-bold uppercase transition-colors shrink-0">
-              Go Premium
-            </Link>
-          </div>
-        </div>
-      );
-    }
-    
-    return null;
-  };
+  const trialBanner = user && subscription?.plan === 'Free Plan' && (subscription?.trialDaysLeft ?? 0) > 0 && (
+    <div className="bg-blue-600 text-white text-xs py-2 px-4 text-center">
+      <span className="font-medium">{subscription.trialDaysLeft} days left on your free trial.</span>{' '}
+      <Link to="/subscription" className="font-semibold underline underline-offset-2 ml-1">Upgrade now</Link>
+    </div>
+  );
 
   return (
-    <header className="sticky top-0 z-40 w-full flex flex-col">
-      {renderBanner()}
-      <nav className="bg-white border-b border-gray-100 shadow-sm w-full">
-        <div className="max-w-7xl mx-auto px-4 h-16 flex items-center gap-3">
+    <header className="sticky top-0 z-40 w-full flex flex-col bg-white border-b border-gray-100 shadow-[0_1px_0_0_#f3f4f6]">
+      {trialBanner}
 
-        {/* Logo */}
-        <Link to="/" className="flex items-center gap-2.5 shrink-0 mr-2">
-          <div className="w-8 h-8 rounded-xl bg-blue-600 flex items-center justify-center shadow-sm">
-            <FiTrendingUp size={16} className="text-white" />
-          </div>
-          <div className="hidden sm:block">
-            <span className="font-black text-gray-900 text-base tracking-tight">REKTINA</span>
-            <span className="font-black text-blue-600 text-base tracking-tight"> MARKET</span>
-          </div>
-        </Link>
+      <nav className="w-full px-4">
+        <div className="max-w-6xl mx-auto h-14 flex items-center gap-3">
 
-        {/* Nav links desktop */}
-        <div className="hidden lg:flex items-center gap-0.5">
-          {NAV_LINKS.map(({ to, label }) => (
-            <Link key={to} to={to}
-              className={`px-3.5 py-2 rounded-lg text-sm font-medium transition-colors ${isActive(to) ? 'text-blue-600 bg-blue-50' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'}`}>
-              {label}
-            </Link>
-          ))}
-        </div>
+          <Logo to="/" size="sm" className="shrink-0 mr-1" />
 
-        {/* Search */}
-        <form onSubmit={handleSearch} className="flex-1 max-w-md hidden md:flex mx-2">
-          <div className={`relative w-full transition-all ${searchFocused ? 'scale-[1.01]' : ''}`}>
-            <FiSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={15} />
-            <input
-              type="search"
-              value={searchVal}
-              onChange={e => setSearchVal(e.target.value)}
-              onFocus={() => setSearchFocused(true)}
-              onBlur={() => setSearchFocused(false)}
-              placeholder="Search products, brands, sellers..."
-              className="w-full pl-10 pr-4 py-2.5 rounded-xl text-sm border border-gray-200 bg-gray-50 text-gray-900 placeholder-gray-400 outline-none focus:border-blue-400 focus:bg-white focus:shadow-sm transition-all"
-              aria-label="Search"
-            />
-          </div>
-        </form>
-
-        {/* Right actions */}
-        <div className="flex items-center gap-1 ml-auto">
-
-          {user && (
-            <>
-              {/* Messages */}
-              <Link to="/messages"
-                className={`relative p-2.5 rounded-xl transition-colors ${isActive('/messages') ? 'text-blue-600 bg-blue-50' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'}`}
-                aria-label="Messages">
-                <FiMessageCircle size={18} />
-                {unreadMessages > 0 && (
-                  <span className="absolute top-1.5 right-1.5 w-4 h-4 bg-blue-600 text-white text-[9px] font-bold rounded-full flex items-center justify-center">
-                    {unreadMessages}
-                  </span>
-                )}
+          {/* Desktop nav links */}
+          <div className="hidden lg:flex items-center gap-0.5">
+            {NAV_LINKS.map(({ to, label }) => (
+              <Link key={to} to={to}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                  isActive(to) ? 'text-blue-600 bg-blue-50' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                }`}>
+                {label}
               </Link>
+            ))}
+          </div>
 
-              {/* Notifications */}
-              <div className="relative">
-                <button
-                  onClick={() => { setNotifOpen(true); markNotificationsRead(); }}
-                  className={`relative p-2.5 rounded-xl transition-colors ${notifOpen ? 'text-blue-600 bg-blue-50' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'}`}
-                  aria-label="Notifications"
-                >
+          {/* Search */}
+          <form onSubmit={handleSearch} className="flex-1 max-w-xs hidden md:flex mx-3">
+            <div className="relative w-full">
+              <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={15} />
+              <input type="search" value={searchVal} onChange={e => setSearchVal(e.target.value)}
+                placeholder="Search products..."
+                className="w-full pl-9 pr-4 py-2 rounded-xl text-sm border border-gray-200 bg-slate-50 outline-none focus:bg-white focus:border-blue-400 transition-all"
+                aria-label="Search" />
+            </div>
+          </form>
+
+          <div className="flex items-center gap-0.5 ml-auto">
+
+            {/* Notifications */}
+            {user && (
+              <div className="relative" ref={notifRef}>
+                <button onClick={() => { setNotifOpen(o => !o); if (!notifOpen) markNotificationsRead(); }}
+                  className={`relative p-2 rounded-lg transition-colors ${notifOpen ? 'text-blue-600 bg-blue-50' : 'text-gray-500 hover:bg-gray-50'}`}>
                   <FiBell size={18} />
                   {unreadNotifs > 0 && (
-                    <span className="absolute top-1.5 right-1.5 w-4 h-4 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">
+                    <span className="absolute top-1 right-1 w-3.5 h-3.5 bg-red-500 text-white text-[8px] font-bold rounded-full flex items-center justify-center">
                       {unreadNotifs}
                     </span>
                   )}
                 </button>
               </div>
-            </>
-          )}
-
-          {/* Cart */}
-          <Link to="/cart"
-            className={`relative p-2.5 rounded-xl transition-colors ${isActive('/cart') ? 'text-blue-600 bg-blue-50' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'}`}
-            aria-label={`Cart, ${cartCount} items`}>
-            <FiShoppingCart size={18} />
-            {cartCount > 0 && (
-              <span className="absolute top-1.5 right-1.5 w-4 h-4 bg-blue-600 text-white text-[9px] font-bold rounded-full flex items-center justify-center">
-                {cartCount > 9 ? '9+' : cartCount}
-              </span>
             )}
-          </Link>
 
-          {/* User menu */}
-          {user ? (
-            <div ref={userRef} className="relative ml-1">
-              <button
-                onClick={() => setUserOpen(o => !o)}
-                className={`flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-xl border transition-colors ${userOpen ? 'border-blue-300 bg-blue-50' : 'border-gray-200 hover:border-gray-300 bg-white'}`}
-              >
-                <div className="w-7 h-7 rounded-lg bg-blue-600 flex items-center justify-center text-white text-xs font-bold">
-                  {user.name[0].toUpperCase()}
-                </div>
-                <span className="text-sm font-medium text-gray-800 hidden sm:block">{user.name.split(' ')[0]}</span>
-                <FiChevronDown size={13} className={`text-gray-400 transition-transform ${userOpen ? 'rotate-180' : ''}`} />
-              </button>
-              {userOpen && (
-                <div className="absolute right-0 top-12 w-56 rounded-2xl shadow-xl border border-gray-100 overflow-hidden animate-fade-in z-50 bg-white">
-                  <div className="px-4 py-3 bg-gradient-to-br from-blue-50 to-white border-b border-gray-100">
-                    <p className="font-bold text-sm text-gray-900">{user.name}</p>
-                    <p className="text-xs text-gray-400 capitalize mt-0.5">{user.role} account</p>
+            {/* Cart */}
+            <Link to="/cart"
+              className={`relative p-2 rounded-lg transition-colors ${isActive('/cart') ? 'text-blue-600 bg-blue-50' : 'text-gray-500 hover:bg-gray-50'}`}>
+              <FiShoppingCart size={18} />
+              {cartCount > 0 && (
+                <span className="absolute top-1 right-1 w-3.5 h-3.5 bg-blue-600 text-white text-[8px] font-bold rounded-full flex items-center justify-center">
+                  {cartCount > 9 ? '9+' : cartCount}
+                </span>
+              )}
+            </Link>
+
+            {/* User menu */}
+            {user ? (
+              <div ref={userRef} className="relative ml-1">
+                <button onClick={() => setUserOpen(o => !o)}
+                  className={`flex items-center gap-2 pl-1.5 pr-2.5 py-1 rounded-xl border transition-colors ${userOpen ? 'border-blue-200 bg-blue-50' : 'border-gray-200 hover:border-gray-300'}`}>
+                  <div className="w-7 h-7 rounded-lg bg-blue-600 flex items-center justify-center text-white text-xs font-semibold shrink-0">
+                    {user.name[0].toUpperCase()}
                   </div>
-                  <div className="py-1">
+                  <span className="text-sm font-medium text-gray-800 hidden sm:block max-w-[80px] truncate">{user.name.split(' ')[0]}</span>
+                  <FiChevronDown size={13} className={`text-gray-400 transition-transform shrink-0 ${userOpen ? 'rotate-180' : ''}`} />
+                </button>
+
+                {userOpen && (
+                  <div className="absolute right-0 top-11 w-52 rounded-xl shadow-lg border border-gray-100 overflow-hidden animate-fade-in z-50 bg-white py-1">
+                    <div className="px-3 py-2.5 border-b border-gray-50">
+                      <p className="font-semibold text-sm text-gray-900 truncate">{user.name}</p>
+                      <p className="text-xs text-gray-400 capitalize mt-0.5">{user.role}</p>
+                    </div>
                     {(user.role === 'seller' || user.role === 'admin') && (
                       <Link to={user.role === 'seller' ? '/seller' : '/admin'} onClick={() => setUserOpen(false)}
-                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors">
-                        <FiGrid size={15} /> {user.role === 'seller' ? 'Seller Dashboard' : 'Admin Panel'}
+                        className="flex items-center gap-2.5 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                        <FiGrid size={14} /> {user.role === 'seller' ? 'Seller Dashboard' : 'Admin Panel'}
                       </Link>
                     )}
-                    <Link to="/orders" onClick={() => setUserOpen(false)} className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
-                      <FiPackage size={15} /> My Orders
-                    </Link>
-                    <Link to="/profile" onClick={() => setUserOpen(false)} className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
-                      <FiUser size={15} /> Profile
-                    </Link>
-                    <Link to="/subscription" onClick={() => setUserOpen(false)} className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
-                      <FiCreditCard size={15} /> Subscription Plan
-                    </Link>
-                    <Link to="/referrals" onClick={() => setUserOpen(false)} className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
-                      <FiGift size={15} /> Refer & Earn
-                    </Link>
-                    <Link to="/messages" onClick={() => setUserOpen(false)} className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
-                      <FiMessageCircle size={15} /> Messages
-                      {unreadMessages > 0 && <span className="ml-auto w-5 h-5 rounded-full bg-blue-600 text-white text-[10px] font-bold flex items-center justify-center">{unreadMessages}</span>}
-                    </Link>
+                    <Link to="/orders" onClick={() => setUserOpen(false)} className="flex items-center gap-2.5 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"><FiPackage size={14} /> My Orders</Link>
+                    <Link to="/profile" onClick={() => setUserOpen(false)} className="flex items-center gap-2.5 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"><FiUser size={14} /> Profile</Link>
+                    <Link to="/subscription" onClick={() => setUserOpen(false)} className="flex items-center gap-2.5 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"><FiCreditCard size={14} /> Subscription</Link>
+                    <Link to="/referrals" onClick={() => setUserOpen(false)} className="flex items-center gap-2.5 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"><FiGift size={14} /> Referrals</Link>
+                    <div className="border-t border-gray-50 mt-1 pt-1">
+                      <button onClick={handleLogout} className="flex items-center gap-2.5 px-3 py-2 text-sm text-red-600 hover:bg-red-50 w-full text-left">
+                        <FiLogOut size={14} /> Sign out
+                      </button>
+                    </div>
                   </div>
-                  <div className="border-t border-gray-100 py-1">
-                    <button onClick={() => { logout(); setUserOpen(false); navigate('/'); }}
-                      className="flex items-center gap-3 px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 w-full transition-colors">
-                      <FiLogOut size={15} /> Sign Out
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="flex items-center gap-2 ml-1">
-              <Link to="/login" className="px-3.5 py-2 text-sm font-medium text-gray-600 hover:text-blue-600 transition-colors rounded-lg hover:bg-gray-50">
-                Sign In
-              </Link>
-              <Link to="/register" className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm transition-all shadow-sm hover:shadow-md">
-                Sign Up
-              </Link>
-            </div>
-          )}
+                )}
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5 ml-1">
+                <Link to="/login" className="px-3 py-1.5 text-sm font-medium text-gray-600 hover:text-blue-600 rounded-lg transition-colors">Sign in</Link>
+                <Link to="/register" className="px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm transition-colors">Sign up</Link>
+              </div>
+            )}
 
-          {/* Mobile toggle */}
-          <button onClick={() => setMobileOpen(o => !o)}
-            className="lg:hidden p-2.5 rounded-xl text-gray-500 hover:bg-gray-50 transition-colors ml-1"
-            aria-label="Toggle menu">
-            {mobileOpen ? <FiX size={20} /> : <FiMenu size={20} />}
-          </button>
+            {/* Mobile toggle */}
+            <button onClick={() => setMobileOpen(o => !o)}
+              className="lg:hidden p-2 rounded-lg text-gray-500 hover:bg-gray-50 ml-0.5" aria-label="Menu">
+              {mobileOpen ? <FiX size={20} /> : <FiMenu size={20} />}
+            </button>
+          </div>
         </div>
-      </div>
+      </nav>
 
       {/* Mobile menu */}
       {mobileOpen && (
-        <div className="lg:hidden border-t border-gray-100 bg-white px-4 py-4 space-y-1 animate-fade-in">
+        <div className="lg:hidden border-t border-gray-100 px-4 pb-4 pt-3 space-y-1 animate-fade-in bg-white">
           <form onSubmit={handleSearch} className="mb-3">
             <div className="relative">
               <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={15} />
-              <input type="search" value={searchVal} onChange={e => setSearchVal(e.target.value)}
-                placeholder="Search products..."
-                className="w-full pl-9 pr-4 py-2.5 rounded-xl text-sm border border-gray-200 bg-gray-50 outline-none focus:border-blue-400" />
+              <input type="search" value={searchVal} onChange={e => setSearchVal(e.target.value)} placeholder="Search products..."
+                className="w-full pl-9 pr-4 py-2.5 rounded-xl text-sm border border-gray-200 bg-slate-50 outline-none focus:border-blue-400" />
             </div>
           </form>
           {NAV_LINKS.map(({ to, label }) => (
             <Link key={to} to={to}
-              className={`flex items-center px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${isActive(to) ? 'text-blue-600 bg-blue-50' : 'text-gray-700 hover:bg-gray-50'}`}>
+              className={`block px-3 py-2.5 rounded-lg text-sm font-medium ${isActive(to) ? 'text-blue-600 bg-blue-50' : 'text-gray-700 hover:bg-gray-50'}`}>
               {label}
             </Link>
           ))}
           {user && (
-            <>
-              <Link to="/orders" className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm text-gray-700 hover:bg-gray-50"><FiPackage size={15} /> My Orders</Link>
-              <Link to="/messages" className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm text-gray-700 hover:bg-gray-50"><FiMessageCircle size={15} /> Messages</Link>
-              <Link to="/profile" className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm text-gray-700 hover:bg-gray-50"><FiUser size={15} /> Profile</Link>
-              <Link to="/subscription" className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm text-gray-700 hover:bg-gray-50"><FiCreditCard size={15} /> Subscription Plan</Link>
-              <Link to="/referrals" className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm text-gray-700 hover:bg-gray-50"><FiGift size={15} /> Refer & Earn</Link>
-            </>
+            <div className="pt-2 border-t border-gray-50 space-y-1 mt-1">
+              <Link to="/orders" className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm text-gray-700 hover:bg-gray-50"><FiPackage size={15} /> Orders</Link>
+              <Link to="/profile" className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm text-gray-700 hover:bg-gray-50"><FiUser size={15} /> Profile</Link>
+              <Link to="/subscription" className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm text-gray-700 hover:bg-gray-50"><FiCreditCard size={15} /> Subscription</Link>
+            </div>
           )}
         </div>
       )}
-      </nav>
 
-      {/* Notification Center Side Drawer Overlay */}
+      {/* Notification drawer */}
       {notifOpen && (
         <div className="fixed inset-0 z-50 flex justify-end">
-          {/* Backdrop */}
-          <div 
-            className="fixed inset-0 bg-black/45 backdrop-blur-xs transition-opacity"
-            onClick={() => setNotifOpen(false)}
-          />
-          
-          {/* Drawer Panel */}
-          <div 
-            ref={drawerRef}
-            className="relative w-full sm:w-96 bg-white h-full shadow-2xl z-50 flex flex-col animate-slide-in overflow-hidden border-l border-gray-100"
-          >
-            {/* Header */}
-            <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setNotifOpen(false)} />
+          <div ref={drawerRef} className="relative w-full sm:w-80 bg-white h-full shadow-xl z-50 flex flex-col animate-slide-in">
+            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between shrink-0">
               <div>
-                <h3 className="font-black text-gray-900 text-base">Notification Center</h3>
-                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mt-0.5">
-                  {unreadNotifs} Unread Notifications
-                </p>
+                <h3 className="font-semibold text-gray-900">Notifications</h3>
+                <p className="text-xs text-gray-400 mt-0.5">{unreadNotifs} unread</p>
               </div>
-              <button 
-                onClick={() => setNotifOpen(false)}
-                className="p-1.5 rounded-lg text-gray-400 hover:text-gray-900 hover:bg-gray-50 transition-colors"
-              >
-                <FiX size={18} />
-              </button>
+              <button onClick={() => setNotifOpen(false)} className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-50"><FiX size={18} /></button>
             </div>
-            
-            {/* Category Filter Tabs */}
-            <div className="px-6 py-3 bg-gray-50/50 border-b border-gray-100 flex gap-1.5 overflow-x-auto scrollbar-none">
-              {['All', 'Orders', 'System', 'Disputes'].map(cat => {
-                const count = (cat === 'All') 
-                  ? notifications.filter(n => !n.read).length 
-                  : notifications.filter(n => n.category === cat && !n.read).length;
-                const isSelected = activeCategory === cat;
+            <div className="px-4 py-2 border-b border-gray-50 flex gap-1.5 overflow-x-auto shrink-0">
+              {['All', 'Orders', 'System', 'Disputes'].map(cat => (
+                <button key={cat} onClick={() => setActiveCategory(cat)}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-medium shrink-0 transition-colors ${activeCategory === cat ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                  {cat}
+                </button>
+              ))}
+            </div>
+            <div className="flex-1 overflow-y-auto">
+              {notifications.filter(n => activeCategory === 'All' || n.category === activeCategory).map(n => {
+                const Icon = n.category === 'Orders' ? FiPackage : n.category === 'Disputes' ? FiShield : FiInfo;
                 return (
-                  <button
-                    key={cat}
-                    onClick={() => setActiveCategory(cat)}
-                    className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all shrink-0 ${isSelected ? 'bg-blue-600 text-white shadow-sm shadow-blue-50' : 'bg-white border border-gray-200 text-gray-500 hover:bg-gray-100'}`}
-                  >
-                    {cat}
-                    {count > 0 && (
-                      <span className={`ml-1.5 px-1 py-0.5 text-[8px] font-black rounded-full leading-none ${isSelected ? 'bg-white text-blue-600' : 'bg-red-500 text-white'}`}>
-                        {count}
-                      </span>
-                    )}
-                  </button>
+                  <div key={n.id} className={`p-4 flex gap-3 border-b border-gray-50 group ${!n.read ? 'bg-blue-50/30' : ''}`}>
+                    <Icon size={15} className="text-gray-400 shrink-0 mt-0.5" />
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-sm leading-relaxed ${!n.read ? 'text-gray-900 font-medium' : 'text-gray-500'}`}>{n.text}</p>
+                      <span className="text-xs text-gray-400 mt-1 block">{n.time}</span>
+                    </div>
+                    <button onClick={() => deleteNotification(n.id)}
+                      className="opacity-0 group-hover:opacity-100 p-1 text-gray-300 hover:text-red-500 transition-all shrink-0">
+                      <FiTrash2 size={13} />
+                    </button>
+                  </div>
                 );
               })}
-            </div>
-            
-            {/* Notification List Scroll Area */}
-            <div className="flex-1 overflow-y-auto divide-y divide-gray-50">
-              {(() => {
-                const filtered = notifications.filter(n => activeCategory === 'All' || n.category === activeCategory);
-                if (filtered.length > 0) {
-                  return filtered.map(n => {
-                    let Icon = FiBell;
-                    let iconBg = 'bg-gray-100 text-gray-500';
-                    if (n.category === 'Orders') {
-                      Icon = FiPackage;
-                      iconBg = 'bg-blue-50 text-blue-600';
-                    } else if (n.category === 'System') {
-                      Icon = FiInfo;
-                      iconBg = 'bg-purple-50 text-purple-600';
-                    } else if (n.category === 'Disputes') {
-                      Icon = FiShield;
-                      iconBg = 'bg-red-50 text-red-600';
-                    }
-                    
-                    return (
-                      <div 
-                        key={n.id}
-                        className={`p-5 flex gap-4 hover:bg-gray-50/40 transition-all group relative border-l-2 ${!n.read ? 'border-blue-600 bg-blue-50/10' : 'border-transparent'}`}
-                      >
-                        <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${iconBg}`}>
-                          <Icon size={16} />
-                        </div>
-                        <div className="flex-1 min-w-0 pr-6">
-                          <p className={`text-xs leading-relaxed ${!n.read ? 'text-gray-950 font-semibold' : 'text-gray-500 font-medium'}`}>
-                            {n.text}
-                          </p>
-                          <span className="text-[10px] text-gray-400 font-semibold mt-1.5 block">{n.time}</span>
-                        </div>
-                        
-                        {/* Hover action to delete */}
-                        <button
-                          onClick={() => deleteNotification(n.id)}
-                          className="absolute right-4 top-1/2 -translate-y-1/2 p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all"
-                          title="Delete notification"
-                        >
-                          <FiTrash2 size={13} />
-                        </button>
-                      </div>
-                    );
-                  });
-                } else {
-                  return (
-                    <div className="h-full flex flex-col items-center justify-center text-center p-8 space-y-3">
-                      <div className="w-14 h-14 rounded-full bg-gray-50 flex items-center justify-center text-gray-300">
-                        <FiBell size={24} />
-                      </div>
-                      <div>
-                        <p className="font-bold text-gray-800 text-sm">All caught up!</p>
-                        <p className="text-xs text-gray-400 mt-1 max-w-xs mx-auto">
-                          No notifications found in {activeCategory}. Any updates will show up here.
-                        </p>
-                      </div>
-                    </div>
-                  );
-                }
-              })()}
-            </div>
-            
-            {/* Drawer Footer Actions */}
-            <div className="p-4 bg-gray-50 border-t border-gray-100 flex gap-2 text-center">
-              {notifications.length > 0 && (
-                <button
-                  onClick={clearNotifications}
-                  className="flex-1 py-3 rounded-xl border border-gray-200 bg-white hover:bg-gray-100 text-[10px] font-bold uppercase tracking-wider text-gray-500 transition-colors flex items-center justify-center gap-1.5"
-                >
-                  <FiTrash2 size={12} /> Clear All
-                </button>
+              {notifications.filter(n => activeCategory === 'All' || n.category === activeCategory).length === 0 && (
+                <div className="flex flex-col items-center justify-center h-40 text-center px-6">
+                  <FiBell size={22} className="text-gray-200 mb-2" />
+                  <p className="text-sm text-gray-400 font-medium">All caught up</p>
+                  <p className="text-xs text-gray-300 mt-1">No {activeCategory !== 'All' ? activeCategory.toLowerCase() + ' ' : ''}notifications</p>
+                </div>
               )}
-              <Link
-                to="/orders"
-                onClick={() => setNotifOpen(false)}
-                className="flex-1 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-bold uppercase tracking-wider text-center transition-all shadow-sm shadow-blue-50 block leading-normal"
-              >
-                Track Orders
-              </Link>
             </div>
+            {notifications.length > 0 && (
+              <div className="p-3 border-t border-gray-100 shrink-0">
+                <button onClick={clearNotifications}
+                  className="w-full py-2.5 rounded-xl text-xs font-medium text-gray-500 hover:bg-gray-50 border border-gray-200 transition-colors">
+                  Clear all notifications
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

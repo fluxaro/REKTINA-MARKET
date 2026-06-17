@@ -19,13 +19,10 @@ export function AppProvider({ children }) {
   // Notifications / Toasts
   const [toasts, setToasts] = useState([]);
 
-  // Unread messages
-  const [unreadMessages, setUnreadMessages] = useState(3);
-
   // Notifications
   const [notifications, setNotifications] = useState([
     { id: 1, text: 'Your order #1042 has been shipped', read: false, time: '2m ago', category: 'Orders' },
-    { id: 2, text: 'New message from Chukwuemeka Gadgets', read: false, time: '1h ago', category: 'System' },
+    { id: 2, text: 'Subscription trial: 14 days remaining', read: false, time: '1h ago', category: 'System' },
     { id: 3, text: 'Your dispute DISP-101 is under review', read: false, time: '3h ago', category: 'Disputes' },
   ]);
 
@@ -181,9 +178,9 @@ export function AppProvider({ children }) {
   const cartCount = cart.reduce((sum, i) => sum + i.qty, 0);
   const cartTotal = cart.reduce((sum, i) => sum + i.product.price * i.qty, 0);
 
-  const login = useCallback((userData) => {
+  const login = useCallback((userData, silent = false) => {
     setUser(userData);
-    addToast(`Welcome back, ${userData.name}!`);
+    if (!silent) addToast(`Welcome back, ${userData.name}!`);
   }, [addToast]);
 
   const logout = useCallback(() => {
@@ -325,7 +322,6 @@ export function AppProvider({ children }) {
       user, login, logout,
       cart, addToCart, removeFromCart, updateCartQty, clearCart, cartCount, cartTotal,
       toasts, addToast, removeToast,
-      unreadMessages, setUnreadMessages,
       notifications, markNotificationsRead, addNotification, clearNotifications, deleteNotification,
       notifOpen, setNotifOpen,
       subscription, setSubscription, updateSubscription, cancelSubscription,

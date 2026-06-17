@@ -55,7 +55,7 @@ export default function ProductCard({ product, view = 'grid' }) {
   }
 
   return (
-    <div className="group rounded-2xl overflow-hidden border border-gray-100 bg-white shadow-sm hover:shadow-xl hover:border-blue-100 transition-all duration-300 animate-fade-in flex flex-col">
+    <div className="group rounded-2xl overflow-hidden border border-gray-100 bg-white shadow-sm hover:shadow-md hover:border-blue-100 transition-all duration-200 animate-fade-in flex flex-col">
       {/* Image */}
       <div className="relative overflow-hidden bg-gray-50" style={{ aspectRatio: '1/1' }}>
         <Link to={`/products/${product.id}`}>
@@ -122,7 +122,7 @@ export default function ProductCard({ product, view = 'grid' }) {
         {/* Price + CTA */}
         <div className="flex items-center justify-between mt-auto gap-2">
           <div>
-            <p className="font-black text-blue-600 text-base leading-none">₦{product.price.toFixed(2)}</p>
+            <p className="font-semibold text-blue-600 text-sm leading-none">₦{product.price.toLocaleString('en-NG')}</p>
             {discount > 0 && (
               <p className="text-xs text-gray-400 line-through mt-0.5">₦{product.originalPrice.toFixed(2)}</p>
             )}

@@ -15,6 +15,8 @@ import { useApp } from '../context/AppContext';
 import { SELLER_ANALYTICS, PRODUCTS } from '../data/mockData';
 import Modal from '../components/ui/Modal';
 import Badge from '../components/ui/Badge';
+import StatCard from '../components/ui/StatCard';
+import DashboardLayout from '../components/layout/DashboardLayout';
 import { Skeleton } from '../components/ui/Skeleton';
 
 const STATUS_VARIANT = { pending: 'yellow', processing: 'blue', shipped: 'blue', delivered: 'green', cancelled: 'red' };
@@ -173,106 +175,57 @@ export default function SellerDashboard() {
     { id: 'settings',   icon: FiSettings,    label: 'Profile Settings' },
   ];
 
+  const headerActions = (
+    <>
+      {tab === 'retinaview' && (
+        <div className="relative">
+          <FiCalendar className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={13} />
+          <select value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)}
+            className="pl-8 pr-8 py-2 rounded-xl border border-gray-200 text-xs font-medium bg-white text-gray-700 outline-none focus:border-blue-500 cursor-pointer">
+            {MOCK_MONTHS.map(m => <option key={m}>{m}</option>)}
+          </select>
+        </div>
+      )}
+      <button onClick={() => addToast('Exporting data as CSV...')}
+        className="flex items-center gap-2 px-3 py-2 rounded-xl border border-gray-200 text-xs font-medium text-gray-600 hover:bg-slate-50 transition-colors">
+        <FiDownload size={14} /> Export
+      </button>
+      {tab === 'listings' && (
+        <button onClick={openCreate}
+          className="flex items-center gap-2 px-3 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition-colors">
+          <FiPlus size={14} /> New listing
+        </button>
+      )}
+    </>
+  );
+
+  const freePlanBanner = isFree ? (
+    <div className="bg-amber-50 border-b border-amber-100 px-5 py-2.5 flex items-center justify-between gap-4">
+      <p className="text-xs text-amber-800 font-medium flex items-center gap-2">
+        <FiAlertCircle className="text-amber-500 shrink-0" size={14} />
+        Free plan — upgrade for RETINAview analytics and reduced escrow fees.
+      </p>
+      <button onClick={() => { setUpgradeReason('Upgrade to Premium to activate custom business listings.'); setShowUpgradePrompt(true); }}
+        className="px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-lg text-xs shrink-0 transition-colors">
+        Upgrade
+      </button>
+    </div>
+  ) : null;
+
   return (
-    <div className="min-h-screen bg-gray-50 flex font-sans">
-      
-      {/* ── Sidebar Navigation ── */}
-      <aside className={`${sidebarCollapsed ? 'w-16' : 'w-60'} shrink-0 bg-slate-950 flex flex-col transition-all duration-300 sticky top-0 h-screen z-20`}>
-        <div className="flex items-center gap-3 px-4 py-5 border-b border-slate-800">
-          <div className="w-8 h-8 rounded-xl bg-blue-600 flex items-center justify-center shrink-0 shadow-lg shadow-blue-500/10">
-            <FiTrendingUp size={16} className="text-white" />
-          </div>
-          {!sidebarCollapsed && (
-            <div>
-              <p className="text-white font-black text-xs tracking-wider leading-tight">REKTINA</p>
-              <p className="text-blue-400 font-bold text-[10px] tracking-wider leading-tight">SELLER PORTAL</p>
-            </div>
-          )}
-        </div>
-
-        <nav className="flex-1 px-2.5 py-6 space-y-1 overflow-y-auto">
-          {navItems.map((item) => (
-            <button key={item.id} onClick={() => handleTabChange(item.id)}
-              className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl text-xs font-bold transition-all ${tab === item.id ? 'bg-blue-600 text-white shadow-md shadow-blue-500/15' : 'text-slate-400 hover:text-white hover:bg-slate-900'}`}>
-              <item.icon size={16} className="shrink-0" />
-              {!sidebarCollapsed && (
-                <div className="flex items-center justify-between w-full">
-                  <span>{item.label}</span>
-                  {item.premium && isFree && <FiLock className="text-amber-500 shrink-0" size={12} />}
-                </div>
-              )}
-            </button>
-          ))}
-        </nav>
-
-        <div className="px-3 pb-4">
-          <button onClick={() => setSidebarCollapsed(c => !c)}
-            className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-slate-500 hover:text-white hover:bg-slate-900 transition-colors text-[10px] uppercase font-bold tracking-wider">
-            {sidebarCollapsed ? '→' : '← Collapse Panel'}
-          </button>
-        </div>
-      </aside>
-
-      {/* ── Main Container ── */}
-      <div className="flex-1 min-w-0 flex flex-col">
-        {/* Top Header */}
-        <header className="bg-white border-b border-gray-100 px-6 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sticky top-0 z-10">
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-lg font-black text-gray-900 capitalize">{tab === 'overview' ? 'Seller Hub' : tab.replace('retinaview', 'RETINAview')}</h1>
-              {isFree && (
-                <span className="bg-amber-50 text-amber-600 px-2 py-0.5 rounded-md text-[9px] font-bold border border-amber-100 uppercase tracking-wider">Free Plan Tier</span>
-              )}
-            </div>
-            <p className="text-xs text-gray-400 mt-0.5">Shop Admin: Chukwuemeka Gadgets</p>
-          </div>
-          
-          <div className="flex items-center gap-2.5">
-            {tab === 'retinaview' && (
-              <div className="relative">
-                <FiCalendar className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={13} />
-                <select 
-                  value={selectedMonth} 
-                  onChange={e => setSelectedMonth(e.target.value)}
-                  className="pl-8 pr-8 py-2 rounded-xl border border-gray-200 text-xs font-bold bg-white text-gray-700 outline-none focus:border-blue-500 cursor-pointer"
-                >
-                  {MOCK_MONTHS.map(m => <option key={m}>{m}</option>)}
-                </select>
-              </div>
-            )}
-            
-            <button onClick={() => addToast('Exporting data as CSV...')}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl border border-gray-200 text-xs font-bold text-gray-600 hover:bg-slate-50 transition-colors">
-              <FiDownload size={14} /> Export Report
-            </button>
-            
-            {tab === 'listings' && (
-              <button onClick={openCreate}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-all shadow-md shadow-blue-50">
-                <FiPlus size={14} /> New Listing
-              </button>
-            )}
-          </div>
-        </header>
-
-        {/* Dynamic Warning Banners for Free Users */}
-        {isFree && (
-          <div className="bg-amber-50 border-b border-amber-100 px-6 py-2.5 flex items-center justify-between gap-4">
-            <p className="text-[11px] text-amber-800 font-semibold leading-snug flex items-center gap-2">
-              <FiAlertCircle className="text-amber-500 shrink-0" size={14} />
-              You are using a Free Plan. Unlock +1.05% escrow savings, RETINAview visitor analytics, and VIP listings.
-            </p>
-            <button 
-              onClick={() => { setUpgradeReason('Upgrade to Premium to activate custom business listings.'); setShowUpgradePrompt(true); }}
-              className="px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg text-[10px] uppercase tracking-wider shrink-0 transition-colors"
-            >
-              Upgrade Now
-            </button>
-          </div>
-        )}
-
-        {/* Dashboard Main Workspace */}
-        <main className="flex-1 p-6 overflow-y-auto">
+    <>
+    <DashboardLayout
+      portalLabel="Seller Portal"
+      navItems={navItems.map(item => ({ ...item, badge: item.premium && isFree ? 'PRO' : undefined }))}
+      activeTab={tab}
+      onTabChange={handleTabChange}
+      title={tab === 'overview' ? 'Seller hub' : tab.replace('retinaview', 'RETINAview')}
+      subtitle="Chukwuemeka Gadgets"
+      headerActions={headerActions}
+      banner={freePlanBanner}
+      sidebarCollapsed={sidebarCollapsed}
+      onToggleSidebar={() => setSidebarCollapsed(c => !c)}
+    >
 
           {/* ── TABS 1: HUB OVERVIEW ── */}
           {tab === 'overview' && (
@@ -732,8 +685,7 @@ export default function SellerDashboard() {
             </div>
           )}
 
-        </main>
-      </div>
+    </DashboardLayout>
 
       {/* Listing Create/Edit Modal */}
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editProduct ? 'Modify Listing Details' : 'Create Custom Listing'}>
@@ -919,6 +871,6 @@ export default function SellerDashboard() {
         </div>
       )}
 
-    </div>
+    </>
   );
 }

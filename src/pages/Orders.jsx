@@ -1,357 +1,233 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { 
-  FiPackage, FiChevronRight, FiCheckCircle, FiClock, 
-  FiTruck, FiXCircle, FiShield, FiAlertTriangle, FiStar, FiUpload, FiSend 
-} from 'react-icons/fi';
+import { FiPackage, FiChevronRight, FiSearch, FiTruck, FiCheckCircle, FiClock, FiXCircle, FiAlertCircle } from 'react-icons/fi';
 import { useApp } from '../context/AppContext';
-import { apiGetOrders } from '../api/mockApi';
-import { Skeleton } from '../components/ui/Skeleton';
+import { ORDERS } from '../data/mockData';
+import PageHeader from '../components/ui/PageHeader';
+import EmptyState from '../components/ui/EmptyState';
 import Badge from '../components/ui/Badge';
-import Modal from '../components/ui/Modal';
 
 const STATUS_CONFIG = {
-  pending:    { label: 'Pending',    variant: 'yellow', icon: <FiClock size={12} /> },
-  processing: { label: 'Processing', variant: 'blue',   icon: <FiClock size={12} /> },
-  shipped:    { label: 'Shipped',    variant: 'blue',   icon: <FiTruck size={12} /> },
-  delivered:  { label: 'Delivered (Escrow Held)',  variant: 'green',  icon: <FiShield size={12} /> },
-  completed:  { label: 'Completed (Released)',  variant: 'green',  icon: <FiCheckCircle size={12} /> },
-  disputed:   { label: 'Disputed (Escrow Frozen)',   variant: 'red',    icon: <FiAlertTriangle size={12} /> },
-  refunded:   { label: 'Refunded',   variant: 'gray',    icon: <FiXCircle size={12} /> },
-  cancelled:  { label: 'Cancelled',  variant: 'red',    icon: <FiXCircle size={12} /> },
+  pending:    { label: 'Pending',    variant: 'yellow', icon: FiClock },
+  processing: { label: 'Processing', variant: 'blue',   icon: FiAlertCircle },
+  shipped:    { label: 'Shipped',    variant: 'blue',   icon: FiTruck },
+  delivered:  { label: 'Delivered', variant: 'green',  icon: FiCheckCircle },
+  cancelled:  { label: 'Cancelled', variant: 'red',    icon: FiXCircle },
 };
 
 export default function Orders() {
   const { disputes, addDispute, addToast } = useApp();
-  const [orders, setOrders] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [selected, setSelected] = useState(null);
+  const [search, setSearch]       = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [expandedId, setExpandedId]     = useState(null);
+  const [disputeForm, setDisputeForm]   = useState({ orderId: '', reason: '', description: '', evidence: '' });
+  const [showDisputeModal, setShowDisputeModal] = useState(false);
+  const [reviewForm, setReviewForm] = useState({ orderId: '', rating: 5, comment: '' });
+  const [showReviewModal, setShowReviewModal] = useState(false);
 
-  // Rate & Review Modal states
-  const [reviewOrder, setReviewOrder] = useState(null);
-  const [rating, setRating] = useState(5);
-  const [reviewText, setReviewText] = useState('');
+  const orders = ORDERS || [];
 
-  // Dispute View/Tabs state: 'file' | 'status'
-  const [disputeTab, setDisputeTab] = useState('file');
-  const [disputeReason, setDisputeReason] = useState('Not Delivered');
-  const [disputeDesc, setDisputeDesc] = useState('');
-  const [disputeFile, setDisputeFile] = useState('');
+  const filtered = orders.filter(o => {
+    const matchSearch = o.id.toLowerCase().includes(search.toLowerCase()) ||
+      o.items.some(i => i.name.toLowerCase().includes(search.toLowerCase()));
+    const matchStatus = statusFilter === 'all' || o.status === statusFilter;
+    return matchSearch && matchStatus;
+  });
 
-  // 48h Countdown logic mock
-  const [countdownString, setCountdownString] = useState('47h 59m 52s');
-
-  useEffect(() => {
-    apiGetOrders().then(data => {
-      // Mock V2 status mapping
-      const updatedData = data.map((o, idx) => ({
-        ...o,
-        // Make the first shipped order look like V2 delivered
-        status: idx === 0 ? 'delivered' : o.status,
-        escrowHeld: idx === 0 || o.status === 'shipped',
-      }));
-      setOrders(updatedData);
-      setLoading(false);
-    });
-  }, []);
-
-  // Update countdown clock randomly to simulate seconds ticking
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const h = 47;
-      const m = Math.floor(Math.random() * 60);
-      const s = Math.floor(Math.random() * 60);
-      setCountdownString(`${h}h ${m}m ${s}s`);
-    }, 3000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const handleConfirmReceipt = (orderId) => {
-    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: 'completed', escrowHeld: false } : o));
-    addToast('Funds successfully released to the seller!');
+  const handleOpenDispute = (orderId) => {
+    setDisputeForm(f => ({ ...f, orderId }));
+    setShowDisputeModal(true);
   };
 
-  const handleReorder = (order) => {
-    addToast(`Reordered items from ${order.id} successfully!`, 'success');
+  const handleSubmitDispute = (e) => {
+    e.preventDefault();
+    addDispute(disputeForm.orderId, disputeForm.reason, disputeForm.description, disputeForm.evidence);
+    setShowDisputeModal(false);
+    setDisputeForm({ orderId: '', reason: '', description: '', evidence: '' });
   };
 
-  const submitReview = () => {
-    addToast('Review submitted successfully! Thank you.', 'success');
-    setOrders(prev => prev.map(o => o.id === reviewOrder ? { ...o, reviewed: true } : o));
-    setReviewOrder(null);
-    setReviewText('');
-    setRating(5);
+  const handleSubmitReview = (e) => {
+    e.preventDefault();
+    addToast('Review submitted successfully!', 'success');
+    setShowReviewModal(false);
+    setReviewForm({ orderId: '', rating: 5, comment: '' });
   };
 
-  const submitDispute = (orderId) => {
-    if (!disputeDesc.trim()) {
-      addToast('Please enter a description for the dispute', 'error');
-      return;
-    }
-    // Add dispute globally
-    addDispute(orderId, disputeReason, disputeDesc, disputeFile || 'evidence_upload.png');
-    // Update order status to disputed
-    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: 'disputed' } : o));
-    setDisputeDesc('');
-    setDisputeFile('');
-    setDisputeTab('status');
+  const openReview = (orderId) => {
+    setReviewForm(f => ({ ...f, orderId }));
+    setShowReviewModal(true);
   };
-
-  if (loading) return (
-    <div className="min-h-screen bg-gray-50 p-8">
-      <div className="max-w-3xl mx-auto space-y-4">
-        {[1, 2].map(i => <Skeleton key={i} className="h-32 w-full rounded-2xl" />)}
-      </div>
-    </div>
-  );
 
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-900 font-sans pb-12">
-      <div className="bg-white border-b border-gray-100">
-        <div className="max-w-3xl mx-auto px-4 py-8">
-          <h1 className="text-2xl font-black text-gray-900">Purchases & Escrows</h1>
-          <p className="text-gray-400 text-xs mt-1">Track orders, manage escrows, and handle dispute resolutions</p>
-        </div>
-      </div>
+    <div className="min-h-screen bg-slate-50">
+      <PageHeader title="My orders" subtitle="Track escrow-protected purchases" />
 
-      <div className="max-w-3xl mx-auto px-4 py-8">
-        {orders.length === 0 ? (
+      <div className="max-w-4xl mx-auto px-4 py-8 space-y-6">
+
+        {/* Search + Filter Bar */}
+        <div className="flex flex-col sm:flex-row gap-3">
+          <div className="relative flex-1">
+            <FiSearch size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search orders or items..."
+              className="w-full pl-9 pr-4 py-2.5 rounded-xl text-sm border border-gray-200 bg-white outline-none focus:border-blue-500 transition-colors"
+            />
+          </div>
+          <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
+            {['all','pending','processing','shipped','delivered','cancelled'].map(s => (
+              <button
+                key={s}
+                onClick={() => setStatusFilter(s)}
+                className={`px-3.5 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider shrink-0 transition-colors
+                  ${statusFilter === s ? 'bg-blue-600 text-white shadow-sm' : 'bg-white border border-gray-200 text-gray-500 hover:bg-gray-50'}`}
+              >
+                {s === 'all' ? 'All Orders' : s}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Orders List */}
+        {filtered.length === 0 ? (
           <div className="text-center py-20 bg-white rounded-3xl border border-gray-100 shadow-sm">
-            <div className="w-16 h-16 rounded-2xl bg-blue-50 flex items-center justify-center mx-auto mb-4">
-              <FiPackage size={28} className="text-blue-600" />
+            <div className="w-14 h-14 rounded-2xl bg-gray-50 flex items-center justify-center mx-auto mb-4">
+              <FiPackage size={24} className="text-gray-300" />
             </div>
-            <p className="font-bold text-gray-900 mb-1">No orders yet</p>
-            <p className="text-gray-400 text-xs mb-5">Your order escrow history will appear here</p>
-            <Link to="/products" className="px-5 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-bold hover:bg-blue-700 transition-colors shadow-md shadow-blue-50">
-              Start Shopping
+            <p className="font-bold text-gray-500 text-sm">No orders found</p>
+            <p className="text-[11px] text-gray-400 mt-1">
+              {search ? `No results for "${search}"` : 'Start shopping to see your orders here'}
+            </p>
+            <Link to="/products" className="inline-block mt-5 px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-sm transition-colors">
+              Browse Products
             </Link>
           </div>
         ) : (
-          <div className="space-y-5">
-            {orders.map(order => {
-              const sc = STATUS_CONFIG[order.status] || STATUS_CONFIG.pending;
-              const hasActiveDispute = disputes.find(d => d.orderId === order.id);
+          <div className="space-y-4">
+            {filtered.map(order => {
+              const cfg = STATUS_CONFIG[order.status] || STATUS_CONFIG.pending;
+              const StatusIcon = cfg.icon;
+              const isExpanded = expandedId === order.id;
+              const hasDispute = disputes.some(d => d.orderId === order.id);
 
               return (
-                <div key={order.id} className="rounded-3xl border border-gray-100 bg-white shadow-sm overflow-hidden transition-all duration-300">
-                  <div className="flex items-center justify-between px-6 py-5 border-b border-gray-50">
-                    <div>
-                      <p className="font-mono font-black text-blue-600 text-sm">{order.id}</p>
-                      <p className="text-[10px] text-gray-400 mt-0.5">{order.date}</p>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <Badge variant={sc.variant}>{sc.icon} <span className="font-bold text-[10px] uppercase tracking-wider">{sc.label}</span></Badge>
-                      <button onClick={() => setSelected(selected === order.id ? null : order.id)}
-                        className="w-8 h-8 rounded-xl bg-slate-50 flex items-center justify-center text-gray-400 hover:text-blue-600 transition-colors">
-                        <FiChevronRight size={18} className={`transition-transform duration-300 ${selected === order.id ? 'rotate-90 text-blue-600' : ''}`} />
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="px-6 py-4 flex items-center gap-4">
-                    <div className="flex -space-x-3">
-                      {order.items.slice(0, 3).map((item, i) => (
-                        <img key={i} src={item.image} alt={item.name} className="w-12 h-12 rounded-xl object-cover border-2 border-white shadow-sm" />
-                      ))}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-bold text-gray-800 truncate">
-                        {order.items[0].name}{order.items.length > 1 ? ` +${order.items.length - 1} other item` : ''}
-                      </p>
-                      <p className="text-[11px] text-gray-400 mt-0.5">Quantity: {order.items.reduce((sum, item) => sum + item.qty, 0)}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-black text-blue-600">₦{order.total.toLocaleString('en-NG')}</p>
-                      {order.escrowHeld && (
-                        <p className="text-[9px] text-orange-500 font-bold uppercase tracking-wider mt-0.5">UVEA Locked</p>
-                      )}
-                    </div>
-                  </div>
-
-                  {selected === order.id && (
-                    <div className="px-6 pb-6 pt-2 border-t border-gray-50 space-y-6">
-                      
-                      {/* Delivered Phase & 48h Countdown Timer */}
-                      {order.status === 'delivered' && (
-                        <div className="p-4 bg-emerald-50/50 border border-emerald-100 rounded-2xl flex flex-col md:flex-row items-center justify-between gap-4">
-                          <div>
-                            <h4 className="text-xs font-bold text-emerald-900 flex items-center gap-1.5">
-                              <FiClock className="animate-spin text-emerald-600" style={{ animationDuration: '6s' }} />
-                              48h Auto-Release Active
-                            </h4>
-                            <p className="text-[10px] text-emerald-700/80 leading-relaxed mt-1">
-                              Funds auto-release to seller in <strong className="font-mono text-emerald-800">{countdownString}</strong>. Please confirm receipt below.
-                            </p>
-                          </div>
-                          <button 
-                            onClick={() => handleConfirmReceipt(order.id)}
-                            className="w-full md:w-auto px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md shadow-emerald-100 transition-colors shrink-0"
-                          >
-                            I Have Received This
-                          </button>
-                        </div>
-                      )}
-
-                      {/* Dispute Dashboard Section */}
-                      <div className="border border-slate-100 rounded-2xl p-5 bg-slate-50/50">
-                        <div className="flex items-center justify-between mb-4 border-b border-gray-100 pb-3">
-                          <h4 className="text-xs font-black text-gray-900 flex items-center gap-1.5">
-                            <FiAlertTriangle className="text-red-500" />
-                            UVEA Escrow Disputes
-                          </h4>
-                          {hasActiveDispute && (
-                            <div className="flex rounded-xl bg-slate-100 p-0.5">
-                              <button onClick={() => setDisputeTab('file')} className={`px-2.5 py-1 text-[10px] font-bold rounded-lg ${disputeTab === 'file' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-400'}`}>File New</button>
-                              <button onClick={() => setDisputeTab('status')} className={`px-2.5 py-1 text-[10px] font-bold rounded-lg ${disputeTab === 'status' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-400'}`}>Status Logs</button>
-                            </div>
+                <div key={order.id} className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+                  {/* Order Header Row */}
+                  <div
+                    className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 px-5 py-4 cursor-pointer hover:bg-slate-50/50 transition-colors"
+                    onClick={() => setExpandedId(isExpanded ? null : order.id)}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center shrink-0">
+                        <FiPackage size={18} className="text-blue-600" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-mono font-bold text-sm text-blue-600">{order.id}</span>
+                          <Badge variant={cfg.variant}>
+                            <StatusIcon size={10} />
+                            {cfg.label}
+                          </Badge>
+                          {hasDispute && (
+                            <Badge variant="red">Dispute Active</Badge>
                           )}
                         </div>
+                        <p className="text-xs text-gray-400 mt-0.5">{order.date} · {order.items.length} item{order.items.length !== 1 ? 's' : ''}</p>
+                        <p className="text-xs text-gray-500 mt-0.5 font-medium truncate max-w-xs">
+                          {order.items.map(i => i.name).join(', ')}
+                        </p>
+                      </div>
+                    </div>
 
-                        {/* File Tab */}
-                        {(!hasActiveDispute || disputeTab === 'file') ? (
-                          <div className="space-y-4">
-                            <p className="text-[10px] text-gray-400 leading-relaxed">
-                              Issues with delivery or item condition? Lock escrow and alert admins by filing a dispute.
-                            </p>
-                            <div className="grid sm:grid-cols-2 gap-3">
-                              <div>
-                                <label className="text-[9px] text-gray-400 font-bold block mb-1 uppercase">Reason</label>
-                                <select 
-                                  value={disputeReason} 
-                                  onChange={e => setDisputeReason(e.target.value)}
-                                  className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs outline-none focus:border-blue-500"
-                                >
-                                  <option>Not Delivered</option>
-                                  <option>Item Defective / Broken</option>
-                                  <option>Wrong Product Sent</option>
-                                  <option>Seller Refusing Delivery</option>
-                                </select>
+                    <div className="flex items-center gap-3 sm:text-right">
+                      <div>
+                        <p className="font-black text-gray-900 text-base">₦{order.total.toLocaleString('en-NG')}</p>
+                        <p className="text-[10px] text-gray-400 font-semibold">UVEA Escrow</p>
+                      </div>
+                      <FiChevronRight
+                        size={16}
+                        className={`text-gray-400 transition-transform shrink-0 ${isExpanded ? 'rotate-90' : ''}`}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Expanded Order Detail */}
+                  {isExpanded && (
+                    <div className="border-t border-gray-50 px-5 py-5 space-y-5 bg-slate-50/30 animate-fade-in">
+
+                      {/* Items */}
+                      <div>
+                        <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-wider mb-3">Order Items</h4>
+                        <div className="space-y-2">
+                          {order.items.map((item, idx) => (
+                            <div key={idx} className="flex items-center gap-3 p-3 bg-white rounded-2xl border border-gray-100">
+                              <img src={item.image} alt={item.name} className="w-12 h-12 rounded-xl object-cover border border-gray-100 shadow-inner" />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-xs font-bold text-gray-900 truncate">{item.name}</p>
+                                <p className="text-[10px] text-gray-400 mt-0.5">Qty: {item.qty}</p>
                               </div>
-                              <div>
-                                <label className="text-[9px] text-gray-400 font-bold block mb-1 uppercase">Attach Evidence</label>
-                                <div className="relative">
-                                  <FiUpload className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={12} />
-                                  <input 
-                                    type="text" 
-                                    placeholder="Upload photo or logs (e.g. proof.png)" 
-                                    value={disputeFile}
-                                    onChange={e => setDisputeFile(e.target.value)}
-                                    className="w-full pl-8 pr-3 py-2 bg-white border border-gray-200 rounded-xl text-xs outline-none focus:border-blue-500 placeholder-gray-300"
-                                  />
-                                </div>
-                              </div>
+                              <span className="font-black text-xs text-gray-900">₦{(item.price * item.qty).toLocaleString('en-NG')}</span>
                             </div>
-                            <div>
-                              <label className="text-[9px] text-gray-400 font-bold block mb-1 uppercase">Explanation</label>
-                              <textarea 
-                                rows={2}
-                                placeholder="Describe the transaction issue in detail..."
-                                value={disputeDesc}
-                                onChange={e => setDisputeDesc(e.target.value)}
-                                className="w-full p-3 bg-white border border-gray-200 rounded-xl text-xs outline-none resize-none focus:border-blue-500"
-                              />
-                            </div>
-                            <button 
-                              type="button" 
-                              onClick={() => submitDispute(order.id)}
-                              className="w-full py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-colors shadow-md shadow-red-50"
-                            >
-                              <FiSend size={12} /> Lock Escrow & Open Dispute
-                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Shipping + Tracking Timeline */}
+                      <div className="grid sm:grid-cols-2 gap-4">
+                        <div>
+                          <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-wider mb-3">Delivery Address</h4>
+                          <div className="p-4 bg-white border border-gray-100 rounded-2xl text-xs text-gray-500 space-y-1 shadow-sm">
+                            <p className="font-bold text-gray-900">{order.address?.name}</p>
+                            <p>{order.address?.street}</p>
+                            <p>{order.address?.city}, {order.address?.state}</p>
                           </div>
-                        ) : (
-                          // Status Tab
-                          <div className="space-y-4">
-                            {disputes.filter(d => d.orderId === order.id).map(disp => (
-                              <div key={disp.id} className="space-y-3">
-                                <div className="flex justify-between items-center text-xs">
-                                  <span className="font-bold text-gray-900">Dispute ID: {disp.id}</span>
-                                  <span className="capitalize px-2 py-0.5 rounded-full bg-orange-100 text-orange-600 font-bold text-[9px] uppercase tracking-wider">{disp.status.replace('_', ' ')}</span>
+                        </div>
+
+                        <div>
+                          <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-wider mb-3">Tracking Timeline</h4>
+                          <div className="p-4 bg-white border border-gray-100 rounded-2xl space-y-3 shadow-sm relative overflow-hidden">
+                            {[
+                              { label: 'Order Placed', done: true },
+                              { label: 'Processing', done: ['processing','shipped','delivered'].includes(order.status) },
+                              { label: 'Shipped', done: ['shipped','delivered'].includes(order.status) },
+                              { label: 'Delivered', done: order.status === 'delivered' },
+                            ].map((step, i) => (
+                              <div key={i} className="flex items-center gap-3 text-xs">
+                                <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 font-bold text-[10px] ${step.done ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-400'}`}>
+                                  {step.done ? '✓' : i + 1}
                                 </div>
-                                <div className="p-3 bg-white rounded-xl border border-gray-100 text-[11px] text-gray-600">
-                                  <p className="font-semibold text-gray-800">Reason: {disp.reason}</p>
-                                  <p className="mt-1 leading-relaxed">{disp.description}</p>
-                                  <p className="mt-2 text-[9px] text-blue-600 font-bold">📄 Attachment: {disp.evidence}</p>
-                                </div>
-                                {/* Timeline */}
-                                <div className="space-y-2 mt-4 pl-2">
-                                  {disp.timeline.map((step, sidx) => (
-                                    <div key={sidx} className="flex gap-3">
-                                      <div className="flex flex-col items-center">
-                                        <div className={`w-3 h-3 rounded-full mt-1 ${step.done ? 'bg-red-500' : 'bg-gray-200'}`} />
-                                        {sidx < disp.timeline.length - 1 && (
-                                          <div className={`w-0.5 h-6 ${step.done ? 'bg-red-200' : 'bg-gray-100'}`} />
-                                        )}
-                                      </div>
-                                      <div className="pb-1">
-                                        <p className={`text-xs font-semibold ${step.done ? 'text-gray-900' : 'text-gray-400'}`}>{step.title}</p>
-                                        {step.date && <p className="text-[9px] text-gray-400">{step.date}</p>}
-                                      </div>
-                                    </div>
-                                  ))}
-                                </div>
+                                <span className={step.done ? 'text-gray-800 font-semibold' : 'text-gray-400'}>{step.label}</span>
                               </div>
                             ))}
                           </div>
-                        )}
-                      </div>
-
-                      {/* Shipment Tracking details */}
-                      <div>
-                        <h4 className="text-xs font-black text-gray-900 mb-3">Shipment Progress</h4>
-                        <div className="space-y-0.5 pl-2">
-                          {order.tracking.map((t, i) => (
-                            <div key={i} className="flex gap-3">
-                              <div className="flex flex-col items-center">
-                                <div className={`w-3 h-3 rounded-full mt-1 ${t.done ? 'bg-blue-600 shadow-md shadow-blue-100' : 'bg-gray-200'}`} />
-                                {i < order.tracking.length - 1 && (
-                                  <div className={`w-0.5 h-6 ${t.done ? 'bg-blue-200' : 'bg-gray-100'}`} />
-                                )}
-                              </div>
-                              <div className="pb-2">
-                                <p className={`text-xs font-semibold ${t.done ? 'text-gray-900' : 'text-gray-400'}`}>{t.status}</p>
-                                {t.date && <p className="text-[9px] text-gray-400">{t.date}</p>}
-                              </div>
-                            </div>
-                          ))}
                         </div>
                       </div>
 
-                      {/* Ordered Items list */}
-                      <div>
-                        <h4 className="text-xs font-black text-gray-900 mb-3">Order Invoice Details</h4>
-                        <div className="space-y-3">
-                          {order.items.map((item, i) => (
-                            <div key={i} className="flex items-center gap-3 bg-slate-50/50 p-2.5 rounded-2xl border border-slate-50">
-                              <img src={item.image} alt={item.name} className="w-12 h-12 rounded-xl object-cover border border-gray-100" />
-                              <div className="flex-1 min-w-0">
-                                <p className="text-xs font-bold text-gray-900 truncate">{item.name}</p>
-                                <p className="text-[10px] text-gray-400">Quantity: {item.qty}</p>
-                              </div>
-                              <p className="text-xs font-black text-blue-600">₦{item.price.toLocaleString('en-NG')}</p>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Action buttons */}
-                      <div className="flex gap-2 pt-2 border-t border-gray-50">
-                        {order.status === 'completed' && !order.reviewed && (
-                          <button 
-                            onClick={() => setReviewOrder(order.id)}
-                            className="flex-1 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md shadow-blue-50 transition-colors"
+                      {/* Actions */}
+                      <div className="flex flex-wrap gap-2 pt-2 border-t border-gray-50">
+                        {order.status === 'delivered' && !hasDispute && (
+                          <button
+                            onClick={() => openReview(order.id)}
+                            className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-sm transition-colors"
                           >
-                            Rate & Review Product
+                            Leave a Review
                           </button>
                         )}
-                        <button 
-                          onClick={() => handleReorder(order)}
-                          className="flex-1 py-3 rounded-xl border border-gray-200 text-gray-600 font-bold text-xs hover:bg-gray-50 transition-colors"
-                        >
-                          Reorder Items
-                        </button>
+                        {!hasDispute && order.status !== 'cancelled' && (
+                          <button
+                            onClick={() => handleOpenDispute(order.id)}
+                            className="px-4 py-2 rounded-xl border border-red-200 text-red-500 font-bold text-xs hover:bg-red-50 transition-colors"
+                          >
+                            Open Dispute
+                          </button>
+                        )}
+                        {hasDispute && (
+                          <span className="px-4 py-2 rounded-xl bg-red-50 text-red-600 font-bold text-xs border border-red-100">
+                            Dispute Under Review
+                          </span>
+                        )}
                       </div>
-
                     </div>
                   )}
                 </div>
@@ -361,62 +237,102 @@ export default function Orders() {
         )}
       </div>
 
-      {/* Rate & Review Modal Overlay */}
-      {reviewOrder && (
-        <Modal 
-          open={!!reviewOrder} 
-          onClose={() => setReviewOrder(null)} 
-          title="Product Rate & Review"
-        >
-          <div className="space-y-5">
-            <div className="text-center">
-              <p className="text-xs text-gray-400 mb-2">How would you grade your purchase?</p>
-              <div className="flex justify-center gap-1">
-                {[1, 2, 3, 4, 5].map(star => (
-                  <button 
-                    key={star} 
-                    type="button" 
-                    onClick={() => setRating(star)}
-                    className="text-yellow-400 focus:outline-none transition-transform hover:scale-110"
-                  >
-                    <FiStar 
-                      size={28} 
-                      className={star <= rating ? 'fill-yellow-400' : 'text-gray-300'} 
-                    />
-                  </button>
-                ))}
+      {/* Dispute Modal */}
+      {showDisputeModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-3xl border border-gray-100 shadow-2xl p-6 max-w-md w-full animate-fade-in">
+            <h3 className="font-bold text-gray-900 mb-1">File a Dispute</h3>
+            <p className="text-xs text-gray-400 mb-5">Order: <strong className="text-blue-600 font-mono">{disputeForm.orderId}</strong> — Escrow funds will be frozen.</p>
+
+            <form onSubmit={handleSubmitDispute} className="space-y-4 text-xs">
+              <div>
+                <label className="text-[10px] text-gray-400 font-bold block mb-1 uppercase">Dispute Reason</label>
+                <select
+                  required
+                  value={disputeForm.reason}
+                  onChange={e => setDisputeForm(f => ({ ...f, reason: e.target.value }))}
+                  className="w-full px-3 py-2.5 rounded-xl border border-gray-200 bg-gray-50 text-xs outline-none focus:border-blue-500"
+                >
+                  <option value="">Select reason...</option>
+                  <option value="item_not_delivered">Item Not Delivered</option>
+                  <option value="not_as_described">Not As Described</option>
+                  <option value="damaged_item">Damaged Item</option>
+                  <option value="wrong_item">Wrong Item Sent</option>
+                  <option value="fraudulent_seller">Fraudulent Seller</option>
+                  <option value="other">Other</option>
+                </select>
               </div>
-            </div>
-
-            <div>
-              <label className="text-[10px] text-gray-400 font-bold block mb-1.5 uppercase">Write your comment</label>
-              <textarea 
-                rows={3}
-                placeholder="Share your experience with this product..."
-                value={reviewText}
-                onChange={e => setReviewText(e.target.value)}
-                className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-xs outline-none resize-none focus:bg-white focus:border-blue-500"
-              />
-            </div>
-
-            <div className="flex gap-2">
-              <button 
-                type="button" 
-                onClick={() => setReviewOrder(null)}
-                className="flex-1 py-3 rounded-xl border border-gray-200 text-xs font-semibold text-gray-500 hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-              <button 
-                type="button" 
-                onClick={submitReview}
-                className="flex-1 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md shadow-blue-50"
-              >
-                Submit Review
-              </button>
-            </div>
+              <div>
+                <label className="text-[10px] text-gray-400 font-bold block mb-1 uppercase">Dispute Description</label>
+                <textarea
+                  required
+                  rows={3}
+                  value={disputeForm.description}
+                  onChange={e => setDisputeForm(f => ({ ...f, description: e.target.value }))}
+                  placeholder="Describe the issue in detail..."
+                  className="w-full p-3 rounded-xl border border-gray-200 bg-gray-50 text-xs resize-none outline-none focus:border-blue-500"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] text-gray-400 font-bold block mb-1 uppercase">Evidence (optional)</label>
+                <input
+                  type="text"
+                  value={disputeForm.evidence}
+                  onChange={e => setDisputeForm(f => ({ ...f, evidence: e.target.value }))}
+                  placeholder="File name or URL of evidence..."
+                  className="w-full px-3 py-2.5 rounded-xl border border-gray-200 bg-gray-50 text-xs outline-none focus:border-blue-500"
+                />
+              </div>
+              <div className="flex gap-2 pt-2">
+                <button type="button" onClick={() => setShowDisputeModal(false)} className="flex-1 py-2.5 rounded-xl border border-gray-200 text-xs font-bold text-gray-500 hover:bg-gray-50">Cancel</button>
+                <button type="submit" disabled={!disputeForm.reason || !disputeForm.description} className="flex-1 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white font-bold text-xs disabled:opacity-50 shadow-md">Submit Dispute</button>
+              </div>
+            </form>
           </div>
-        </Modal>
+        </div>
+      )}
+
+      {/* Review Modal */}
+      {showReviewModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-3xl border border-gray-100 shadow-2xl p-6 max-w-sm w-full animate-fade-in">
+            <h3 className="font-bold text-gray-900 mb-1">Leave a Review</h3>
+            <p className="text-xs text-gray-400 mb-5">Your honest feedback helps other buyers and improves seller reputation.</p>
+
+            <form onSubmit={handleSubmitReview} className="space-y-4 text-xs">
+              <div>
+                <label className="text-[10px] text-gray-400 font-bold block mb-1 uppercase">Star Rating</label>
+                <div className="flex gap-2">
+                  {[1,2,3,4,5].map(star => (
+                    <button
+                      key={star}
+                      type="button"
+                      onClick={() => setReviewForm(f => ({ ...f, rating: star }))}
+                      className={`text-2xl transition-transform hover:scale-110 ${star <= reviewForm.rating ? 'text-yellow-400' : 'text-gray-200'}`}
+                    >
+                      ★
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="text-[10px] text-gray-400 font-bold block mb-1 uppercase">Your Comment</label>
+                <textarea
+                  required
+                  rows={3}
+                  value={reviewForm.comment}
+                  onChange={e => setReviewForm(f => ({ ...f, comment: e.target.value }))}
+                  placeholder="Describe your experience with the seller..."
+                  className="w-full p-3 rounded-xl border border-gray-200 bg-gray-50 text-xs resize-none outline-none focus:border-blue-500"
+                />
+              </div>
+              <div className="flex gap-2">
+                <button type="button" onClick={() => setShowReviewModal(false)} className="flex-1 py-2.5 rounded-xl border border-gray-200 text-xs font-bold text-gray-500 hover:bg-gray-50">Cancel</button>
+                <button type="submit" disabled={!reviewForm.comment} className="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs disabled:opacity-50 shadow-md">Submit Review</button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   );

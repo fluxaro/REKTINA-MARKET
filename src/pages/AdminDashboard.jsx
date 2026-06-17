@@ -14,6 +14,8 @@ import { useApp } from '../context/AppContext';
 import { ADMIN_ANALYTICS, CATEGORIES, SELLER_ANALYTICS } from '../data/mockData';
 import { apiGetUsers } from '../api/mockApi';
 import Badge from '../components/ui/Badge';
+import StatCard from '../components/ui/StatCard';
+import DashboardLayout from '../components/layout/DashboardLayout';
 import { Skeleton } from '../components/ui/Skeleton';
 import CategoryIcon from '../components/ui/CategoryIcon';
 import Modal from '../components/ui/Modal';
@@ -155,56 +157,24 @@ export default function AdminDashboard() {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50 flex font-sans">
-      
-      {/* ── Sidebar ── */}
-      <aside className={`${sidebarCollapsed ? 'w-16' : 'w-60'} shrink-0 bg-slate-950 flex flex-col transition-all duration-300 sticky top-0 h-screen z-20`}>
-        <div className="flex items-center gap-3 px-4 py-5 border-b border-slate-800">
-          <div className="w-8 h-8 rounded-xl bg-blue-600 flex items-center justify-center shrink-0 shadow-lg shadow-blue-500/10">
-            <FiTrendingUp size={16} className="text-white" />
-          </div>
-          {!sidebarCollapsed && (
-            <div>
-              <p className="text-white font-black text-xs tracking-wider leading-tight">REKTINA</p>
-              <p className="text-red-400 font-bold text-[10px] tracking-wider leading-tight">SUPERADMIN</p>
-            </div>
-          )}
-        </div>
-
-        <nav className="flex-1 px-2.5 py-6 space-y-1 overflow-y-auto">
-          {navItems.map((item) => (
-            <button key={item.id} onClick={() => setTab(item.id)}
-              className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl text-xs font-bold transition-all ${tab === item.id ? 'bg-blue-600 text-white shadow-md shadow-blue-500/15' : 'text-slate-400 hover:text-white hover:bg-slate-900'}`}>
-              <item.icon size={16} className="shrink-0" />
-              {!sidebarCollapsed && <span>{item.label}</span>}
-            </button>
-          ))}
-        </nav>
-
-        <div className="px-3 pb-4">
-          <button onClick={() => setSidebarCollapsed(c => !c)}
-            className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-slate-500 hover:text-white hover:bg-slate-900 transition-colors text-[10px] uppercase font-bold tracking-wider">
-            {sidebarCollapsed ? '→' : '← Collapse Panel'}
-          </button>
-        </div>
-      </aside>
-
-      {/* ── Main Container ── */}
-      <div className="flex-1 min-w-0 flex flex-col">
-        <header className="bg-white border-b border-gray-100 px-6 py-4 flex items-center justify-between sticky top-0 z-10">
-          <div>
-            <h1 className="text-lg font-black text-gray-900 capitalize">{tab.replace('retinaview', 'RETINAview').replace('overview', 'Platform Dashboard')}</h1>
-            <p className="text-xs text-gray-400 mt-0.5">Control Center • UVEA Escrow Override Active</p>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-green-100 bg-green-50 text-green-600 text-xs font-bold shadow-sm">
-              <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-              Secure Gateway Sync
-            </span>
-          </div>
-        </header>
-
-        <main className="flex-1 p-6 overflow-y-auto">
+    <>
+    <DashboardLayout
+      portalLabel="Admin Console"
+      portalAccent="text-red-400"
+      navItems={navItems}
+      activeTab={tab}
+      onTabChange={setTab}
+      title={tab.replace('retinaview', 'RETINAview').replace('overview', 'Platform overview')}
+      subtitle="UVEA escrow override active"
+      headerActions={
+        <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-emerald-100 bg-emerald-50 text-emerald-600 text-xs font-medium">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+          Live
+        </span>
+      }
+      sidebarCollapsed={sidebarCollapsed}
+      onToggleSidebar={() => setSidebarCollapsed(c => !c)}
+    >
 
           {/* ── TABS 1: PLATFORM STATS OVERVIEW ── */}
           {tab === 'overview' && (
@@ -724,9 +694,7 @@ export default function AdminDashboard() {
             </div>
           )}
 
-        </main>
-      </div>
-
-    </div>
+    </DashboardLayout>
+    </>
   );
 }

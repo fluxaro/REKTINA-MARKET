@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
-  FiShoppingCart, FiMessageCircle, FiShield, FiTruck, FiArrowLeft,
+  FiShoppingCart, FiShield, FiTruck, FiArrowLeft,
   FiPlus, FiMinus, FiHeart, FiShare2, FiCheckCircle, FiStar,
   FiPackage, FiRefreshCw,
 } from 'react-icons/fi';
@@ -212,10 +212,10 @@ export default function ProductDetail() {
               </button>
             </div>
 
-            {/* Chat with seller */}
-            <Link to="/messages"
-              className="flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-gray-200 text-gray-600 hover:border-blue-300 hover:text-blue-600 font-semibold text-sm transition-all">
-              <FiMessageCircle size={16} /> Chat with Seller
+            {/* Seller link */}
+            <Link to="/sellers"
+              className="flex items-center justify-center gap-2 py-3 rounded-xl border border-gray-200 text-gray-600 hover:border-blue-300 hover:text-blue-600 font-medium text-sm transition-all">
+              View Seller Profile
             </Link>
 
             {/* Trust badges */}

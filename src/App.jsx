@@ -1,5 +1,8 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
+import { useEffect } from 'react';
 import { AppProvider } from './context/AppContext';
+import { AuthProvider } from './context/AuthContext';
+import AuthSync from './components/auth/AuthSync';
 import Navbar from './components/layout/Navbar';
 import Footer from './components/layout/Footer';
 import BottomTabBar from './components/layout/BottomTabBar';
@@ -13,7 +16,6 @@ import Cart from './pages/Cart';
 import Checkout from './pages/Checkout';
 import Orders from './pages/Orders';
 import Auth from './pages/Auth';
-import Messages from './pages/Messages';
 import Sellers from './pages/Sellers';
 import SellerDashboard from './pages/SellerDashboard';
 import AdminDashboard from './pages/AdminDashboard';
@@ -23,7 +25,16 @@ import Referrals from './pages/Referrals';
 import About from './pages/About';
 import NotFound from './pages/NotFound';
 
-function Layout({ children }) {
+/** Scrolls to top on every route change */
+function ScrollToTop() {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  }, [pathname]);
+  return null;
+}
+
+function MainLayout({ children }) {
   return (
     <div className="flex flex-col min-h-screen pb-16 lg:pb-0">
       <Navbar />
@@ -34,70 +45,54 @@ function Layout({ children }) {
   );
 }
 
+function DashboardShell({ children }) {
+  return <div className="min-h-screen">{children}</div>;
+}
+
 export default function App() {
   return (
     <BrowserRouter>
       <AppProvider>
-        <ToastContainer />
-        <Routes>
-          {/* Public */}
-          <Route path="/" element={<Layout><Home /></Layout>} />
-          <Route path="/products" element={<Layout><Products /></Layout>} />
-          <Route path="/products/:id" element={<Layout><ProductDetail /></Layout>} />
-          <Route path="/sellers" element={<Layout><Sellers /></Layout>} />
-          <Route path="/cart" element={<Layout><Cart /></Layout>} />
-          <Route path="/about" element={<Layout><About /></Layout>} />
-          <Route path="/login" element={<Auth mode="login" />} />
-          <Route path="/register" element={<Auth mode="register" />} />
+        <AuthProvider>
+          <AuthSync />
+          <ToastContainer />
+          <ScrollToTop />
+          <Routes>
+            {/* Public */}
+            <Route path="/" element={<MainLayout><Home /></MainLayout>} />
+            <Route path="/products" element={<MainLayout><Products /></MainLayout>} />
+            <Route path="/products/:id" element={<MainLayout><ProductDetail /></MainLayout>} />
+            <Route path="/sellers" element={<MainLayout><Sellers /></MainLayout>} />
+            <Route path="/cart" element={<MainLayout><Cart /></MainLayout>} />
+            <Route path="/about" element={<MainLayout><About /></MainLayout>} />
 
-          {/* Protected - any logged-in user */}
-          <Route path="/checkout" element={
-            <ProtectedRoute>
-              <Layout><Checkout /></Layout>
-            </ProtectedRoute>
-          } />
-          <Route path="/orders" element={
-            <ProtectedRoute>
-              <Layout><Orders /></Layout>
-            </ProtectedRoute>
-          } />
-          <Route path="/messages" element={
-            <ProtectedRoute>
-              <Layout><Messages /></Layout>
-            </ProtectedRoute>
-          } />
-          <Route path="/profile" element={
-            <ProtectedRoute>
-              <Layout><Profile /></Layout>
-            </ProtectedRoute>
-          } />
-          <Route path="/subscription" element={
-            <ProtectedRoute>
-              <Layout><Subscription /></Layout>
-            </ProtectedRoute>
-          } />
-          <Route path="/referrals" element={
-            <ProtectedRoute>
-              <Layout><Referrals /></Layout>
-            </ProtectedRoute>
-          } />
+            {/* Auth */}
+            <Route path="/auth" element={<Auth />} />
+            <Route path="/login" element={<Auth mode="login" />} />
+            <Route path="/register" element={<Auth mode="register" />} />
 
-          {/* Seller only */}
-          <Route path="/seller" element={
-            <ProtectedRoute roles={['seller', 'admin']}>
-              <Layout><SellerDashboard /></Layout>
-            </ProtectedRoute>
-          } />
+            {/* Buyer protected */}
+            <Route path="/checkout" element={<ProtectedRoute><MainLayout><Checkout /></MainLayout></ProtectedRoute>} />
+            <Route path="/orders" element={<ProtectedRoute><MainLayout><Orders /></MainLayout></ProtectedRoute>} />
+            <Route path="/profile" element={<ProtectedRoute><MainLayout><Profile /></MainLayout></ProtectedRoute>} />
+            <Route path="/subscription" element={<ProtectedRoute><MainLayout><Subscription /></MainLayout></ProtectedRoute>} />
+            <Route path="/referrals" element={<ProtectedRoute><MainLayout><Referrals /></MainLayout></ProtectedRoute>} />
 
-          {/* Admin only */}
-          <Route path="/admin" element={
-            <ProtectedRoute roles={['admin']}>
-              <Layout><AdminDashboard /></Layout>
-            </ProtectedRoute>
-          } />
+            {/* Dashboards */}
+            <Route path="/seller" element={
+              <ProtectedRoute roles={['seller', 'admin']}>
+                <DashboardShell><SellerDashboard /></DashboardShell>
+              </ProtectedRoute>
+            } />
+            <Route path="/admin" element={
+              <ProtectedRoute roles={['admin']}>
+                <DashboardShell><AdminDashboard /></DashboardShell>
+              </ProtectedRoute>
+            } />
 
-          <Route path="*" element={<Layout><NotFound /></Layout>} />
-        </Routes>
+            <Route path="*" element={<MainLayout><NotFound /></MainLayout>} />
+          </Routes>
+        </AuthProvider>
       </AppProvider>
     </BrowserRouter>
   );
